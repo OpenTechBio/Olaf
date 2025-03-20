@@ -1,0 +1,47 @@
+name: CI
+
+on: [pull_request]
+
+jobs:
+  frontend:
+    name: Build Angular Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'  # Adjust as needed
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm install  # Ensures a clean install with package-lock.json
+
+      - name: Build Angular app
+        run: |
+          cd frontend
+          npm run watch
+
+  backend:
+    name: Deploy Firebase Functions
+    runs-on: ubuntu-latest
+    needs: frontend  # Ensures frontend builds before deploying backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Install backend dependencies
+        run: |
+          pip install -r backend/requirements.txt
