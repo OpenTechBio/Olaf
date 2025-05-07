@@ -2,41 +2,38 @@
 
 # Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-
-# Define the path for the .env file in the script's directory
 ENV_FILE_PATH="${SCRIPT_DIR}/.env"
 
-echo "This script will create a .env file to store your OpenAI API key."
-echo "The file will be saved in the script's directory: ${SCRIPT_DIR}"
-echo "" # Add a blank line for spacing
+echo "This script will create a .env file to store your API keys (OpenAI, Claude, Gemini)."
+echo "The file will be saved in: ${ENV_FILE_PATH}"
+echo ""
 
-# Prompt the user for their OpenAI API key
-# -p: Display the prompt string
-# -s: Silent mode (do not echo input characters) - recommended for keys/passwords
-# -r: Raw mode (backslashes are not treated as escape characters)
-read -p "Please enter your OpenAI API key: " -s -r OPENAI_API_KEY
-echo "" # Add a newline after the hidden input
+# Prompt for API keys (optional, but must provide at least one)
+read -p "Please enter your OpenAI API key (optional): " -s -r OPENAI_API_KEY
+echo ""
+read -p "Please enter your Claude API key (optional): " -s -r CLAUDE_API_KEY
+echo ""
+read -p "Please enter your Gemini API key (optional): " -s -r GEMINI_API_KEY
+echo ""
 
-# Check if the key was entered
-if [ -z "$OPENAI_API_KEY" ]; then
-  echo "Error: No API key entered. Exiting."
+# Check if at least one was entered
+if [ -z "$OPENAI_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ] && [ -z "$GEMINI_API_KEY" ]; then
+  echo "⚠️  Error: You must enter at least one API key. Exiting."
   exit 1
 fi
 
-# Write the key to the .env file in the format OPENAI_KEY:key_value
-# Overwrites the file if it already exists
-echo "OPENAI_API_KEY=${OPENAI_API_KEY}" > "${ENV_FILE_PATH}"
+# Write each non-empty key to the .env file
+echo "# Auto-generated .env file with API keys" > "${ENV_FILE_PATH}"
 
-# Check if the file was created successfully
-if [ $? -eq 0 ]; then
-  echo "" # Add a blank line
-  echo "Successfully saved the OpenAI API key to ${ENV_FILE_PATH}"
-  # Optionally, set permissions to be readable only by the user
-  chmod 600 "${ENV_FILE_PATH}"
-  echo "Set permissions for ${ENV_FILE_PATH} to read-only for the current user (600)."
-else
-  echo "Error: Failed to write to ${ENV_FILE_PATH}. Please check permissions."
-  exit 1
-fi
+[ -n "$OPENAI_API_KEY" ] && echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> "${ENV_FILE_PATH}"
+[ -n "$CLAUDE_API_KEY" ] && echo "CLAUDE_API_KEY=${CLAUDE_API_KEY}" >> "${ENV_FILE_PATH}"
+[ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API_KEY=${GEMINI_API_KEY}" >> "${ENV_FILE_PATH}"
+
+# Set secure permissions
+chmod 600 "${ENV_FILE_PATH}"
+
+echo ""
+echo "✅ Successfully saved keys to ${ENV_FILE_PATH}"
+echo "🔒 Permissions set to read/write for user only (600)."
 
 exit 0
