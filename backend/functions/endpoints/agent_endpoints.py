@@ -32,6 +32,12 @@ def l3_master_agent_interaction(req: Request) -> Response:
         if not session_id:
             session_id = None
 
+        # Extract the optional 'provider' argument, defaulting to 'chatgpt'
+        try:
+            provider = req.get_json().get("provider", "chatgpt")
+        except Exception:
+            provider = "chatgpt"
+
         # Retrieve or create session
         if session_id is None:
             session_data = session_service.create_session(
@@ -75,7 +81,7 @@ def l3_master_agent_interaction(req: Request) -> Response:
                 # Invoke the route → returns a generator of chunk dictionaries
                 response_generator = router.route(route_key, route_data)
 
-                partial_response = ""
+                partial_response = "" # This might not be needed with the new streaming method
 
                 for chunk in response_generator:
                     try:
@@ -139,6 +145,12 @@ def master_agent_interaction(req: Request) -> Response:
         if not session_id:
             session_id = None
 
+        # Extract the optional 'provider' argument, defaulting to 'chatgpt'
+        try:
+            provider = req.get_json().get("provider", "chatgpt")
+        except Exception:
+            provider = "chatgpt"
+
         # Retrieve or create session with the new user message
         if session_id is None:
             session_data = session_service.create_session(
@@ -166,7 +178,7 @@ def master_agent_interaction(req: Request) -> Response:
         router = Router()
         router.add_route("master", masteragent_route)
         router.add_route("master", masteragent_route)
-        response_generator = router.route("master", session_data["history"])  # type: ignore
+        response_generator = router.route("master", session_data["history"], provider)  # type: ignore
 
         # NOTE can probably be put into agent service.
         # the add_message_to_session() call can probably be done by putting a
@@ -206,6 +218,7 @@ def master_agent_interaction(req: Request) -> Response:
 
 @on_request(cors=CorsOptions(cors_origins="*", cors_methods=["post"]))
 def name_maker(req: Request) -> Response:
+    provider = req.get_json().get("provider", "chatgpt") # Add provider
     try:
         history = validate_name_maker_request(req)
 
@@ -216,7 +229,7 @@ def name_maker(req: Request) -> Response:
         hist = History(history)
         hist.log("system", system, "text")
 
-        response = chat_completion(hist)
+        response = chat_completion(hist, provider=provider) # Pass provider
         response_str = ""
         for chunk in response:
             response_str += (

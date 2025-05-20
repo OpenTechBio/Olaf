@@ -3,21 +3,25 @@ import re
 import json
 from fpdf import FPDF
 from openai import OpenAI
+import anthropic
 from os import environ
 
 from datastructures.history import History
+from services.ai_facade import ChatGPTFacade, ClaudeFacade, AIFacade
 
 
-openai_api_key = environ.get("OPENAI_API_KEY")
+def chat_completion(history: History, tools=None, provider: str = 'chatgpt'):
+    """
+    Provides a chat completion using the specified AI provider.
 
-# except the opanai_api_key as an error
-if not openai_api_key:
-    raise ValueError(f"OpenAI API key not found in environment variables.")
-openai_api_url = "https://api.openai.com/v1/chat/completions"
-openai_client = OpenAI(api_key=openai_api_key)
+    Args:
+        history (History): The conversation history.
+        tools (list, optional): A list of tools to provide to the model. Defaults to None.
+        provider (str, optional): The AI provider to use ('chatgpt' or 'claude'). Defaults to 'chatgpt'.
 
-
-def chat_completion(history: History, tools=None):
+    Yields:
+        dict: Chunks of the AI model's response.
+    """
     headers = {
         "Authorization": f"Bearer {openai_api_key}",
         "Content-Type": "application/json",
@@ -47,22 +51,45 @@ def chat_completion(history: History, tools=None):
         return None
 
 
-def chat_completion_function(history: History, tools):
-    stream = openai_client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {
-                "role": "system",
-                "content": "Call the function best suited to find the response",
-            },
-        ]
-        + history.get_history(),  # type: ignore
+def chat_completion_function(history: History, tools, provider: str = 'chatgpt'):
+    """
+    Provides a chat completion that focuses on function calling.
+
+    Args:
+        history (History): The conversation history.
+        tools (list): A list of tools to provide to the model.
+        provider (str, optional): The AI provider to use ('chatgpt' or 'claude'). Defaults to 'chatgpt'.
+
+    Returns:
+        The response stream from the AI provider.
+    """
+    ai_facade = _get_ai_facade(provider)
+    # The system prompt for function calling might need to be adjusted per provider
+    # or handled within the facade's generate_response method if providers have different ways
+    # of handling tool calls. For now, passing it as part of history.
+    # history.log(role="system", content="Call the function best suited to find the response", type="text")
+    stream = ai_facade.generate_response(history=history, tools=tools, system_prompt="Call the function best suited to find the response")
         temperature=0.1,
         tools=tools,
     )
 
     return stream
 
+
+def _get_ai_facade(provider: str) -> AIFacade:
+    """Factory function to get the appropriate AI facade based on provider."""
+    if provider == 'chatgpt':
+        openai_api_key = environ.get("OPENAI_API_KEY")
+        if not openai_api_key:
+            raise ValueError("OpenAI API key not found in environment variables.")
+        return ChatGPTFacade(api_key=openai_api_key)
+    elif provider == 'claude':
+        claude_api_key = environ.get("CLAUDE_API_KEY")
+        if not claude_api_key:
+            raise ValueError("Claude API key not found in environment variables.")
+        return ClaudeFacade(api_key=claude_api_key)
+    else:
+        raise ValueError(f"Unsupported AI provider: {provider}")
 
 def chat_completion_api(history: History, system_prompt: str, tools=None):
     headers = {
@@ -222,11 +249,7 @@ class AgentService:
 
     def __init__(self):
         # we should move this to a secret store and load from there eventually
-        self.openai_api_key = environ.get("OPENAI_API_KEY")
-        self.openai_api_url = "https://api.openai.com/v1/chat/completions"
-        self.openai_client = OpenAI(api_key=openai_api_key)
-
-    def chat_completion_summary(self, history: History) -> str | None:
+        pass # API keys are now handled in _get_ai_facade
         """
         Returns a summary of a chat history as a string. Returns None if response
         fails.
