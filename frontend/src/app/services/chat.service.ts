@@ -14,6 +14,7 @@ export class ChatService {
     environment.l3chatAPIEndpoint;
   private nameMakerAPIEndpoint =  environment.nameMakerAPIEndpoint;
 
+  //add claude support
   constructor(private http: HttpClient) {}
 
   sendMessage(
@@ -21,7 +22,8 @@ export class ChatService {
     sessionId: string,
     userId: string,
     projectId: string,
-    agent: string | null = null
+    agent: string | null = null,
+    provider: string | null = null
   ): Observable<any> {
     // Build the URL with query parameters
     let url = new URL(this.chatAPIEndpoint);
@@ -34,6 +36,9 @@ export class ChatService {
       url.searchParams.append('session_id', sessionId);
     }
     url.searchParams.append('message', message);
+    if (provider == "Claude") {
+      url.searchParams.append('provider', provider);
+    }
 
     return new Observable((subscriber) => {
       const eventSource = new EventSource(url.toString());
