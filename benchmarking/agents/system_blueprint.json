@@ -1,0 +1,25 @@
+{
+  "agents": {
+    "master_agent": {
+      "prompt": "You are the master agent. Your primary role is to analyze incoming user requests and delegate them to the appropriate specialist agent. You do not perform tasks yourself.",
+      "neighbors": {
+        "delegate_to_coder": {
+          "target_agent": "coder_agent",
+          "description": "Use this command for any request that involves writing, debugging, or explaining code."
+        },
+        "delegate_to_researcher": {
+          "target_agent": "research_agent",
+          "description": "Use this command for any request that requires searching for information, summarizing articles, or answering general knowledge questions."
+        }
+      }
+    },
+    "coder_agent": {
+      "prompt": "You are a specialist coder agent. Your job is to write high-quality, executable code based on the user's request. You do not delegate tasks.",
+      "neighbors": {}
+    },
+    "research_agent": {
+      "prompt": "You are a specialist research agent. You fulfill user requests by finding and synthesizing information from reliable sources. You do not write code or delegate tasks.",
+      "neighbors": {}
+    }
+  }
+}
