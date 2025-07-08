@@ -12,7 +12,7 @@ from __future__ import annotations
 import requests
 from types import SimpleNamespace
 from typing import List, Dict, Any
-
+import json
 
 class OllamaClient:
     """
@@ -22,9 +22,11 @@ class OllamaClient:
         print(resp.choices[0].message.content)
     """
 
-    def __init__(self, host: str = "http://localhost:11434", default_model: str = "llama2"):
+    def __init__(self, host: str = "http://localhost:11434", model: str = "llama2"):
+        if not host.startswith(("http://", "https://")):          # ← add
+            host = "http://" + host         
         self._host = host.rstrip("/")
-        self._default_model = default_model
+        self._default_model = model
         # expose nested namespaces so that usage mirrors openai.ChatCompletion
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._chat_create))
 
@@ -32,29 +34,32 @@ class OllamaClient:
     # internal helpers
     # ------------------------------------------------------------------ #
     def _chat_create(
-        self,
-        *,
-        model: str | None = None,
-        messages: List[Dict[str, str]],
-        temperature: float | None = None,
-        **kwargs: Any,
-    ):
-        """POST /api/chat and wrap the response to look like OpenAI’s."""
-        payload: dict[str, Any] = {
-            "model": model or self._default_model,
-            "messages": messages,
-        }
-        if temperature is not None:
-            payload["options"] = {"temperature": temperature}
+            self,
+            *,
+            messages: List[Dict[str, str]],
+            temperature: float | None = None,
+            **kwargs: Any,
+        ):
+            payload = {
+                "model": self._default_model,
+                "messages": messages,
+                "stream": False,
+            }
+            if temperature is not None:
+                payload["options"] = {"temperature": temperature}
 
-        r = requests.post(f"{self._host}/api/chat", json=payload, timeout=300)
-        r.raise_for_status()
-        data = r.json()                       # -> {'message': {...}, 'done': true}
+            r = requests.post(f"{self._host}/api/chat", json=payload, timeout=300)
+            r.raise_for_status()
 
-        content = data["message"]["content"]
-        # fabricate an OpenAI-shaped object tree
-        message = SimpleNamespace(content=content, role="assistant")
-        choice  = SimpleNamespace(message=message, index=0, finish_reason="stop")
-        response_obj = SimpleNamespace(choices=[choice])
+            # ND-JSON → take the line that has the message
+            for line in r.text.strip().splitlines():
+                obj = json.loads(line)
+                if "message" in obj:
+                    content = obj["message"]["content"]
+                    break
+            else:
+                raise ValueError("No message object found in Ollama response")
 
-        return response_obj
+            message = SimpleNamespace(content=content, role="assistant")
+            choice  = SimpleNamespace(message=message, index=0, finish_reason="stop")
+            return SimpleNamespace(choices=[choice])

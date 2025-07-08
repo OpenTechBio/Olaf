@@ -25,6 +25,12 @@ BACKEND_CHOICE = Prompt.ask(
     choices=["chatgpt", "ollama"],
     default="chatgpt",
 )
+OLLAMA_HOST = "http://localhost:11434"
+if BACKEND_CHOICE == "ollama":
+    OLLAMA_HOST = Prompt.ask(
+        "Ollama base URL",
+        default="http://localhost:11434",
+    )
 # ── Dependencies ------------------------------------------------------------
 try:
     from dotenv import load_dotenv
@@ -233,7 +239,14 @@ def run(
     display(console, "system", history[0]["content"])
     display(console, "user", initial_user_message)
 
-    openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    if BACKEND_CHOICE == "chatgpt":
+        if not os.getenv("OPENAI_API_KEY"):
+            console.print("[red]OPENAI_API_KEY not set in .env")
+            sys.exit(1)
+        openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    else:
+        # Local Ollama needs no key; model defaults to “llama2”
+        openai = OpenAI(host=OLLAMA_HOST, model="deepseek-r1:70b")
     current_agent = agent
     turn = 0
 
