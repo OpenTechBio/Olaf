@@ -31,6 +31,7 @@ class Agent:
                 full_prompt += f"\n- Command: `{name}`"
                 full_prompt += f"\n  - Description: {command.description}"
                 full_prompt += f"\n  - Target Agent: {command.target_agent}"
+            full_prompt += "YOU MUST USE THESE EXACT COMMANDS TO DELEGATE TASKS. NO OTHER FORMATTING OR COMMANDS ARE ALLOWED."
         return full_prompt
 
 class AgentSystem:

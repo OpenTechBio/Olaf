@@ -1,0 +1,13 @@
+{
+    "soma_joinid": 7,
+    "citation": "Publication: https://doi.org/10.1038/s41586-024-07944-6 Dataset Version: https://datasets.cellxgene.cziscience.com/463451bb-78a0-447f-9555-b05d11472d09.h5ad curated and distributed by CZ CELLxGENE Discover in Collection: https://cellxgene.cziscience.com/collections/fc19ae6c-d7c1-4dce-b703-62c5d52061b4",
+    "collection_id": "fc19ae6c-d7c1-4dce-b703-62c5d52061b4",
+    "collection_name": "A spatial human thymus cell atlas mapped to a continuous tissue axis",
+    "collection_doi": "10.1038/s41586-024-07944-6",
+    "collection_doi_label": "Yayon et al. (2024) Nature",
+    "dataset_id": "fbd69faa-b0c5-45ba-89c9-da938a7f5a14",
+    "dataset_version_id": "463451bb-78a0-447f-9555-b05d11472d09",
+    "dataset_title": "thymus scRNA-seq atlas - myeloid p2 subset",
+    "dataset_h5ad_path": "fbd69faa-b0c5-45ba-89c9-da938a7f5a14.h5ad",
+    "dataset_total_cell_count": 843
+}

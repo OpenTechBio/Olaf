@@ -71,6 +71,45 @@ ENV_FILE = PARENT_DIR / ".env"
 SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
 SANDBOX_RESOURCES_DIR = "/workspace/resources"
 
+# ── Benchmark persistence --------------------------------------------------
+from datetime import datetime
+import pathlib, base64, json
+
+timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")  # e.g. '20250708-174115'
+_LEDGER_PATH = OUTPUTS_DIR / f"benchmark_history_{timestamp}.jsonl"
+_SNIPPET_DIR = OUTPUTS_DIR / "snippets"
+_SNIPPET_DIR.mkdir(exist_ok=True, parents=True)
+_LEDGER_PATH.parent.mkdir(exist_ok=True, parents=True)
+
+def _dump_code_snippet(run_id: str, code: str) -> str:
+    """
+    Write <run_id>.py under outputs/snippets/ and return the relative path.
+    """
+    snippet_path = _SNIPPET_DIR / f"{run_id}.py"
+    snippet_path.write_text(code, encoding="utf-8")
+    return str(snippet_path.relative_to(OUTPUTS_DIR))
+
+def _save_benchmark_record(*, run_id: str, results: dict, meta: dict, code: str | None):
+    """
+    Append a JSONL record containing timestamp, dataset metadata, metrics, and
+    a pointer to (or inline copy of) the integration code.
+    """
+    record = {
+        "ts": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "run": run_id,
+        "dataset": meta.get("name"),
+        "results": results,
+    }
+    if code:
+        # ↓ option A – path pointer (small, VCS-friendly)
+        record["code_path"] = _dump_code_snippet(run_id, code)
+
+        # ↓ option B – inline base64   (uncomment if you prefer one-file history)
+        # record["code_b64"] = base64.b64encode(code.encode()).decode()
+
+    with _LEDGER_PATH.open("a") as fh:
+        fh.write(json.dumps(record) + "\n")
+
 # ===========================================================================
 # 1 · Backend selection
 # ===========================================================================
@@ -163,6 +202,7 @@ def run(
     tries: int = 0,
 ):
     """Main driver"""
+    last_code_snippet: str | None = None  
     mgr = _BackendManager()
     console.print(f"Launching sandbox ({backend})…")
 
@@ -228,6 +268,7 @@ def run(
         # ── Inline code execution -------------------------------------------
         code = extract_python_code(msg)
         if code:
+            last_code_snippet = code   
             console.print("[cyan]Executing code…[/cyan]")
             try:
                 if is_exec_mode:
@@ -245,7 +286,7 @@ def run(
 
         # ── Automatic benchmarking (v1.2 addition) --------------------------
         if benchmark_module:
-            result_str = run_benchmark(mgr, benchmark_module)
+            result_str = run_benchmark(mgr, benchmark_module, metadata, current_agent.name, last_code_snippet)
             if result_str:
                 history.append({"role": "user", "content": result_str})
                 display(console, "user", result_str)
@@ -295,7 +336,8 @@ def get_benchmark_module(console: Console, parent_dir: Path) -> Optional[Path]:
         return None
 
 
-def run_benchmark(mgr, benchmark_module: Path) -> str:
+def run_benchmark(mgr, benchmark_module: Path, metadata: dict,
+                  agent_name: str, code_snippet: str | None) -> str:
     """Execute benchmark module and *return* a compact JSON string."""
     console.print(f"\n[bold cyan]Running benchmark module: {benchmark_module.name}[/bold cyan]")
     autometric_base_path = benchmark_module.parent / "AutoMetric.py"
@@ -339,6 +381,12 @@ def run_benchmark(mgr, benchmark_module: Path) -> str:
         if exec_result.get("status") == "ok" and isinstance(result_dict, dict):
             for key, value in result_dict.items():
                 table.add_row(str(key), str(value))
+            _save_benchmark_record(
+            run_id=f"{benchmark_module.stem}:{agent_name}:{int(time.time())}",
+            results=result_dict,
+            meta=metadata,
+            code=code_snippet,          # ← NEW
+        )
         else:
             table.add_row("Error", exec_result.get("stderr") or "An unknown error occurred.")
 

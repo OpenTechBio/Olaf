@@ -222,23 +222,27 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
 
             history.append({"role": "user", "content": feedback})
             display(console, "user", feedback)
-
-        if benchmark_module:
-            console.print("\n[bold]Next message (blank = continue, 'benchmark' to run benchmarks, 'exit' to quit):[/bold]")
-        else:
-            console.print("\n[bold]Next message (blank = continue, 'exit' to quit):[/bold]")
-        try:
-            user_in = input().strip()
-        except (EOFError, KeyboardInterrupt):
-            user_in = "exit"
-        if user_in.lower() in {"exit", "quit"}:
+            
+        def input_loop():
+            if benchmark_module:
+                console.print("\n[bold]Next message (blank = continue, 'benchmark' to run benchmarks, 'exit' to quit):[/bold]")
+            else:
+                console.print("\n[bold]Next message (blank = continue, 'exit' to quit):[/bold]")
+            try:
+                user_in = input().strip()
+            except (EOFError, KeyboardInterrupt):
+                user_in = "exit"
+            if user_in.lower() in {"exit", "quit"}:
+                return "break"
+            if user_in.lower() == "benchmark" and benchmark_module:
+                run_benchmark(mgr, benchmark_module)
+                input_loop()  # Recurse to continue the loop after benchmarks
+            if user_in:
+                history.append({"role": "user", "content": user_in})
+                display(console, "user", user_in)
+        input_val = input_loop()
+        if input_val == "break":  # User chose to exit
             break
-        if user_in.lower() == "benchmark" and benchmark_module:
-            run_benchmark(mgr, benchmark_module)
-            continue
-        if user_in:
-            history.append({"role": "user", "content": user_in})
-            display(console, "user", user_in)
 
     console.print("Stopping sandbox…")
     mgr.stop_container()

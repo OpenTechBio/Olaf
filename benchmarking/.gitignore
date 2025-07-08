@@ -5,3 +5,4 @@ outputs/
 *.sif
 *agent_systems/
 agent_systems/
+*.pyc
