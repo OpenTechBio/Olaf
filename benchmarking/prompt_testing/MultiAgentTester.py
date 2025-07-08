@@ -31,6 +31,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
+from benchmarking.prompt_testing.MultiAgentAutoTester import BACKEND_CHOICE
 from rich.table import Table
 # ── Dependencies ------------------------------------------------------------
 try:
@@ -78,7 +79,7 @@ SANDBOX_RESOURCES_DIR = "/workspace/resources"
 # ===========================================================================
 # 1 · Backend selection
 # ===========================================================================
-backend = Prompt.ask("Choose backend", choices=["docker", "singularity", "singularity-exec"], default="docker")
+backend = Prompt.ask("Choose sandbox backend", choices=["docker", "singularity", "singularity-exec"], default="docker")
 force_refresh = Prompt.ask("Force refresh environment?", choices=["y", "n"], default="n").lower() == "y"
 is_exec_mode = backend == "singularity-exec"
 
@@ -171,7 +172,14 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
     display(console, "system", history[0]["content"])
     display(console, "user", first_user)
 
-    openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    if BACKEND_CHOICE == "chatgpt":
+        if not os.getenv("OPENAI_API_KEY"):
+            console.print("[red]OPENAI_API_KEY not set in .env")
+            sys.exit(1)
+        openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    else:
+        # Local Ollama needs no key; model defaults to “llama2”
+        openai = OpenAI()
     current_agent = agent
     turn = 0
 

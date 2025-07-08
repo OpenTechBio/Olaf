@@ -18,13 +18,23 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
 from rich.table import Table
+# -- Pick LLM backend ---------------------------------------------------
+from rich.prompt import Prompt
+BACKEND_CHOICE = Prompt.ask(
+    "LLM backend",
+    choices=["chatgpt", "ollama"],
+    default="chatgpt",
+)
 # ── Dependencies ------------------------------------------------------------
 try:
     from dotenv import load_dotenv
-    from openai import OpenAI, APIError
+    if BACKEND_CHOICE == "ollama":
+        from benchmarking.core.ollama_wrapper import OllamaClient as OpenAI
+        APIError = Exception  # Ollama does not have a specific APIError
+    else:
+        from openai import OpenAI, APIError
     import requests
     from rich.console import Console
-    from rich.prompt import Prompt
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
     sys.exit(1)
@@ -65,7 +75,7 @@ SANDBOX_RESOURCES_DIR = "/workspace/resources"
 # 1 · Backend selection
 # ===========================================================================
 backend = Prompt.ask(
-    "Choose backend", choices=["docker", "singularity", "singularity-exec"], default="docker"
+    "Choose sandbox backend", choices=["docker", "singularity", "singularity-exec"], default="docker"
 )
 force_refresh = (
     Prompt.ask("Force refresh environment?", choices=["y", "n"], default="n").lower() == "y"
