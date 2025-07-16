@@ -194,6 +194,17 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
             if new_agent:
                 console.print(f"[yellow]🔄 Routing to '{tgt}' via {cmd}")
                 history.append({"role": "assistant", "content": f"🔄 Routing to **{tgt}** (command `{cmd}`)"})
+                  
+                # INJECT LOADED CODE SAMPLES ON DELEGATION ---
+                if new_agent.code_samples:
+                    sample_context = "Here are some relevant code samples for your task:"
+                    for filename, code_content in new_agent.code_samples.items():
+                        sample_context += f"\n\n--- Sample from: {filename} ---\n"
+                        sample_context += f"```python\n{code_content.strip()}\n```"
+                    
+                    history.append({"role": "user", "content": sample_context})
+                    display(console, "user", sample_context) # Display for clarity
+
                 current_agent = new_agent
                 history.insert(0, {"role": "system", "content": build_system(new_agent)})
                 continue

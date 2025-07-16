@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict, Any
+from pathlib import Path
 
 # A simple class to hold ANSI color codes for terminal output
 class Colors:
@@ -14,6 +15,9 @@ class Colors:
     ENDC = '\033[0m'         # Reset to default
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+# Define the directory where code samples are stored
+CODE_SAMPLES_DIR = Path("benchmarking/code_samples")
 
 def define_global_policy() -> str:
     """Asks the user to define a global policy for all agents."""
@@ -59,7 +63,8 @@ def define_agents() -> Dict[str, Dict[str, Any]]:
             continue
 
         prompt = input(f"{Colors.WARNING}Enter the system prompt for '{Colors.OKCYAN}{agent_name}{Colors.WARNING}': {Colors.ENDC}").strip()
-        agents[agent_name] = {"prompt": prompt, "neighbors": {}}
+        # Initialize agent with an empty list for code samples
+        agents[agent_name] = {"prompt": prompt, "neighbors": {}, "code_samples": []}
         print(f"{Colors.OKGREEN}Agent '{Colors.OKCYAN}{agent_name}{Colors.OKGREEN}' added successfully.{Colors.ENDC}")
         
     print(f"\n{Colors.OKBLUE}--- All Agents Defined ---{Colors.ENDC}")
@@ -75,63 +80,98 @@ def connect_agents(agents: Dict[str, Dict[str, Any]]) -> None:
 
     agent_names = list(agents.keys())
     if len(agent_names) < 2:
-        print("You need at least two agents to create a connection. Skipping this step.")
+        print(f"{Colors.WARNING}You need at least two agents to create a connection. Skipping this step.{Colors.ENDC}")
         return
 
     while True:
+        # ... (agent connection logic remains unchanged) ...
         print(f"\n{Colors.BOLD}Select the agent that will delegate the task (source agent).{Colors.ENDC}")
         for i, name in enumerate(agent_names):
             print(f"  {i + 1}: {Colors.OKCYAN}{name}{Colors.ENDC}")
-        
         source_choice_input = input(f"{Colors.WARNING}Enter the number of the source agent (or 'done'): {Colors.ENDC}").strip()
-        if source_choice_input.lower() == 'done':
-            break
-
+        if source_choice_input.lower() == 'done': break
         try:
             source_idx = int(source_choice_input) - 1
-            if not 0 <= source_idx < len(agent_names):
-                raise ValueError
+            if not 0 <= source_idx < len(agent_names): raise ValueError
             source_agent_name = agent_names[source_idx]
         except (ValueError, IndexError):
             print(f"{Colors.FAIL}Invalid selection. Please enter a number from the list.{Colors.ENDC}")
             continue
-
         print(f"\nSelected source agent: '{Colors.OKCYAN}{source_agent_name}{Colors.ENDC}'")
         print(f"{Colors.BOLD}Select the agent to delegate to (target agent).{Colors.ENDC}")
-        
-        valid_targets = []
-        for i, name in enumerate(agent_names):
-            if name != source_agent_name:
-                print(f"  {i + 1}: {Colors.OKCYAN}{name}{Colors.ENDC}")
-                valid_targets.append(name)
-
+        valid_targets = [name for name in agent_names if name != source_agent_name]
+        for i, name in enumerate(valid_targets):
+            print(f"  {i + 1}: {Colors.OKCYAN}{name}{Colors.ENDC}")
         target_choice_input = input(f"{Colors.WARNING}Enter the number of the target agent: {Colors.ENDC}").strip()
         try:
             target_idx = int(target_choice_input) - 1
-            potential_target_name = agent_names[target_idx]
-            if potential_target_name not in valid_targets:
-                 raise ValueError
-            target_agent_name = potential_target_name
+            if not 0 <= target_idx < len(valid_targets): raise ValueError
+            target_agent_name = valid_targets[target_idx]
         except (ValueError, IndexError):
-            print(f"{Colors.FAIL}Invalid selection. Please enter a valid number for a different agent.{Colors.ENDC}")
+            print(f"{Colors.FAIL}Invalid selection. Please enter a valid number.{Colors.ENDC}")
             continue
-
         delegation_command = input(f"{Colors.WARNING}Enter the delegation command name (e.g., 'delegate_to_coder'): {Colors.ENDC}").strip()
         description = input(f"{Colors.WARNING}Enter the description for this delegation to '{Colors.OKCYAN}{target_agent_name}{Colors.WARNING}': {Colors.ENDC}").strip()
-
         agents[source_agent_name]["neighbors"][delegation_command] = {
             "target_agent": target_agent_name,
             "description": description
         }
         print(f"{Colors.OKGREEN}Successfully connected '{Colors.OKCYAN}{source_agent_name}{Colors.OKGREEN}' to '{Colors.OKCYAN}{target_agent_name}{Colors.OKGREEN}' via '{delegation_command}'.{Colors.ENDC}")
 
+def assign_code_samples(agents: Dict[str, Dict[str, Any]]) -> None:
+    """Interactively assign code sample files to agents."""
+    print(f"\n{Colors.OKBLUE}--- Code Sample Assignment ---{Colors.ENDC}")
+    
+    # Ensure the code samples directory exists
+    CODE_SAMPLES_DIR.mkdir(exist_ok=True, parents=True)
+    
+    try:
+        sample_files = [f.name for f in CODE_SAMPLES_DIR.glob("*.py")]
+    except Exception as e:
+        print(f"{Colors.FAIL}Could not read code samples directory: {e}{Colors.ENDC}")
+        return
+
+    if not sample_files:
+        print(f"{Colors.WARNING}No code samples found in '{CODE_SAMPLES_DIR}'. Skipping assignment.{Colors.ENDC}")
+        print(f"You can add `.py` files to this directory to make them available.")
+        return
+
+    for agent_name, agent_data in agents.items():
+        while True:
+            assign_prompt = f"\n{Colors.WARNING}Assign code samples to agent '{Colors.OKCYAN}{agent_name}{Colors.WARNING}'? (y/n): {Colors.ENDC}"
+            if input(assign_prompt).strip().lower() != 'y':
+                break
+
+            print(f"{Colors.BOLD}Available code samples:{Colors.ENDC}")
+            for i, filename in enumerate(sample_files):
+                print(f"  {i + 1}: {Colors.OKCYAN}{filename}{Colors.ENDC}")
+
+            choice_prompt = f"{Colors.WARNING}Enter a number to add a sample, or type 'done': {Colors.ENDC}"
+            choice = input(choice_prompt).strip().lower()
+
+            if choice == 'done':
+                break
+            
+            try:
+                index = int(choice) - 1
+                if not 0 <= index < len(sample_files):
+                    raise ValueError
+                
+                chosen_file = sample_files[index]
+                if chosen_file not in agent_data["code_samples"]:
+                    agent_data["code_samples"].append(chosen_file)
+                    print(f"{Colors.OKGREEN}Assigned '{chosen_file}' to '{agent_name}'.{Colors.ENDC}")
+                else:
+                    print(f"{Colors.WARNING}'{chosen_file}' is already assigned to this agent.{Colors.ENDC}")
+
+            except (ValueError, IndexError):
+                print(f"{Colors.FAIL}Invalid selection. Please enter a valid number.{Colors.ENDC}")
 
 def save_configuration(global_policy: str, agents_config: Dict[str, Any], output_dir: str) -> None:
     """Saves the final configuration, including the global policy, to a JSON file."""
     if not agents_config:
         return 
 
-    # The final structure now includes the global_policy at the top level
     final_structure = {
         "global_policy": global_policy,
         "agents": agents_config
@@ -153,7 +193,6 @@ def save_configuration(global_policy: str, agents_config: Dict[str, Any], output
     except IOError as e:
         print(f"\n{Colors.FAIL}Error: Could not save the file. {e}{Colors.ENDC}")
 
-
 def main():
     """Main function to run the interactive agent builder."""
     print(f"{Colors.HEADER}{Colors.BOLD}--- Welcome to the Interactive Agent Configuration Builder ---{Colors.ENDC}")
@@ -164,6 +203,7 @@ def main():
     
     if agents_data:
         connect_agents(agents_data)
+        assign_code_samples(agents_data)
         save_configuration(global_policy_text, agents_data, output_directory)
 
 if __name__ == "__main__":
