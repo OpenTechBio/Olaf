@@ -160,7 +160,7 @@ def load_agent_system() -> Tuple[AgentSystem, Agent, str]:
     system = AgentSystem.load_from_json(str(bp))
     driver_name = Prompt.ask("Driver agent", choices=list(system.agents.keys()), default=list(system.agents)[0])
     driver = system.get_agent(driver_name)
-    instr = system.get_insturctions()
+    instr = system.get_instructions()
     return system, driver, instr
 
 _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
