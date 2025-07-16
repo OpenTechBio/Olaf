@@ -45,12 +45,13 @@ class Agent:
                 full_prompt += f"\n- Command: `{name}`"
                 full_prompt += f"\n  - Description: {command.description}"
                 full_prompt += f"\n  - Target Agent: {command.target_agent}"
-                if self.code_samples:
-                    full_prompt += "\n  - Code Samples Available:"
-                    for sample_name in self.code_samples.keys():
-                        full_prompt += f"\n    - `{sample_name}`"
             full_prompt += "\n\n**YOU MUST USE THESE EXACT COMMANDS TO DELEGATE TASKS. NO OTHER FORMATTING OR COMMANDS ARE ALLOWED.**"
-            
+        
+        if self.code_samples:
+            full_prompt += "\n  - Code Samples Available:"
+            for sample_name in self.code_samples.keys():
+                full_prompt += f"\n    - `{sample_name}`"
+  
         return full_prompt
 
 
