@@ -111,7 +111,7 @@ def load_agent_system() -> Tuple[AgentSystem, Agent, str]:
     system = AgentSystem.load_from_json(str(bp))
     driver_name = Prompt.ask("Driver agent", choices=list(system.agents.keys()), default=list(system.agents)[0])
     driver = system.get_agent(driver_name)
-    instr = system.get_insturctions()
+    instr = system.get_instructions()
     return system, driver, instr
 
 # Smarter regex – matches inline/backtick/explicit styles
@@ -163,7 +163,7 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
     )
 
     def build_system(a: Agent) -> str:
-        return roster_instr + "\n\n" + a.get_full_prompt() + "\n\n" + analysis_ctx
+        return roster_instr + "\n\n" + a.get_full_prompt(agent_system.global_policy) + "\n\n" + analysis_ctx
 
     history = [{"role": "system", "content": build_system(agent)}]
     first_user = "Beginning interactive session. You can ask questions or give commands."

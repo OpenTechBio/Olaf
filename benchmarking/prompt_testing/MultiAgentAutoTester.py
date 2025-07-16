@@ -69,12 +69,18 @@ _SNIPPET_DIR.mkdir(exist_ok=True, parents=True)
 _LEDGER_PATH.parent.mkdir(exist_ok=True, parents=True)
 
 def _dump_code_snippet(run_id: str, code: str) -> str:
+    """
+    Write <run_id>.py under outputs/snippets/ and return the relative path.
+    """
     snippet_path = _SNIPPET_DIR / f"{run_id}.py"
     snippet_path.write_text(code, encoding="utf-8")
     return str(snippet_path.relative_to(OUTPUTS_DIR))
 
 def _save_benchmark_record(*, run_id: str, results: dict, meta: dict, code: str | None):
-    """Save a benchmark record to the ledger file."""
+    """
+    Append a JSONL record containing timestamp, dataset metadata, metrics, and
+    a pointer to (or inline copy of) the integration code.
+    """
     record = {
         "ts": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "run": run_id,
@@ -98,12 +104,30 @@ force_refresh = (
 is_exec_mode = backend == "singularity-exec"
 
 if backend == "docker":
-    _BackendManager, _SANDBOX_HANDLE, COPY_CMD, EXECUTE_ENDPOINT, STATUS_ENDPOINT = init_docker(SCRIPT_DIR, subprocess, console, force_refresh)
+    (
+        _BackendManager,
+        _SANDBOX_HANDLE,
+        COPY_CMD,
+        EXECUTE_ENDPOINT,
+        STATUS_ENDPOINT,
+    ) = init_docker(SCRIPT_DIR, subprocess, console, force_refresh)
     SANDBOX_DATA_PATH = "dataset.h5ad"
 elif backend == "singularity":
-    _BackendManager, _SANDBOX_HANDLE, COPY_CMD, EXECUTE_ENDPOINT, STATUS_ENDPOINT = init_singularity(SCRIPT_DIR, subprocess, console, force_refresh)
+    (
+        _BackendManager,
+        _SANDBOX_HANDLE,
+        COPY_CMD,
+        EXECUTE_ENDPOINT,
+        STATUS_ENDPOINT,
+    ) = init_singularity(SCRIPT_DIR, subprocess, console, force_refresh)
 elif backend == "singularity-exec":
-    _BackendManager, _SANDBOX_HANDLE, COPY_CMD, EXECUTE_ENDPOINT, STATUS_ENDPOINT = init_singularity_exec(SCRIPT_DIR, SANDBOX_DATA_PATH, subprocess, console, force_refresh)
+    (
+        _BackendManager,
+        _SANDBOX_HANDLE,
+        COPY_CMD,
+        EXECUTE_ENDPOINT,
+        STATUS_ENDPOINT,
+    ) = init_singularity_exec(SCRIPT_DIR, SANDBOX_DATA_PATH, subprocess, console, force_refresh)
 else:
     console.print("[red]Unknown backend.")
     sys.exit(1)
@@ -120,7 +144,7 @@ def load_agent_system() -> Tuple[AgentSystem, Agent, str]:
     system = AgentSystem.load_from_json(str(bp))
     driver_name = Prompt.ask("Driver agent", choices=list(system.agents.keys()), default=list(system.agents)[0])
     driver = system.get_agent(driver_name)
-    instr = system.get_instructions()
+    instr = system.get_insturctions()
     return system, driver, instr
 
 _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
@@ -273,16 +297,16 @@ def get_benchmark_module(console: Console, parent_dir: Path) -> Optional[Path]:
     if not benchmark_dir.exists():
         console.print("[red]No benchmarks directory found.[/red]")
         return None
-    
+
     modules = [m for m in benchmark_dir.glob("*.py") if m.name != "AutoMetric.py"]
     if not modules:
         console.print("[red]No benchmark modules found.[/red]")
         return None
-    
+
     console.print("\n[bold]Available benchmark modules:[/bold]")
     for i, mod in enumerate(modules, start=1):
         console.print(f"{i}. {mod.name}")
-        
+
     choice = Prompt.ask("Select a benchmark module by number (or press Enter to skip)", default="")
     if not choice:
         return None
@@ -298,7 +322,10 @@ def get_benchmark_module(console: Console, parent_dir: Path) -> Optional[Path]:
         console.print("[red]Invalid input. Please enter a number.[/red]")
         return None
 
-def run_benchmark(mgr, benchmark_module: Path, metadata: dict, agent_name: str, code_snippet: str | None) -> str:
+
+def run_benchmark(mgr, benchmark_module: Path, metadata: dict,
+                  agent_name: str, code_snippet: str | None) -> str:
+    """Execute benchmark module and *return* a compact JSON string."""
     console.print(f"\n[bold cyan]Running benchmark module: {benchmark_module.name}[/bold cyan]")
     autometric_base_path = benchmark_module.parent / "AutoMetric.py"
     try:

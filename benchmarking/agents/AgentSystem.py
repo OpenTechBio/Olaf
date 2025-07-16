@@ -31,7 +31,7 @@ class Agent:
         sample_keys = list(self.code_samples.keys())
         return f"Agent(name='{self.name}', commands={list(self.commands.keys())}, samples={sample_keys})"
 
-    def get_full_prompt(self, global_policy: str) -> str:
+    def get_full_prompt(self, global_policy=None) -> str:
         """Constructs the full prompt including the global policy and command descriptions."""
         full_prompt = ""
         if global_policy:
@@ -87,7 +87,6 @@ class AgentSystem:
                     description=cmd_data['description']
                 )
 
-            # --- NEW: Load Code Samples from Files ---
             loaded_samples: Dict[str, str] = {}
             # Get the list of filenames from the JSON, e.g., ["load_data.py", "plot.py"]
             sample_filenames = agent_data.get('code_samples', [])
