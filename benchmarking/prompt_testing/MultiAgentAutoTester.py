@@ -78,10 +78,7 @@ SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
 SANDBOX_RESOURCES_DIR = "/workspace/resources"
 
 # ── Benchmark persistence --------------------------------------------------
-from datetime import datetime
-import pathlib, base64, json
-
-timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")  # e.g. '20250708-174115'
+timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
 _LEDGER_PATH = OUTPUTS_DIR / f"benchmark_history_{timestamp}.jsonl"
 _SNIPPET_DIR = OUTPUTS_DIR / "snippets"
 _SNIPPET_DIR.mkdir(exist_ok=True, parents=True)
@@ -107,12 +104,7 @@ def _save_benchmark_record(*, run_id: str, results: dict, meta: dict, code: str 
         "results": results,
     }
     if code:
-        # ↓ option A – path pointer (small, VCS-friendly)
         record["code_path"] = _dump_code_snippet(run_id, code)
-
-        # ↓ option B – inline base64   (uncomment if you prefer one-file history)
-        # record["code_b64"] = base64.b64encode(code.encode()).decode()
-
     with _LEDGER_PATH.open("a") as fh:
         fh.write(json.dumps(record) + "\n")
 
@@ -159,8 +151,8 @@ else:
 # ===========================================================================
 # 2 · Agent helpers
 # ===========================================================================
-
 def load_agent_system() -> Tuple[AgentSystem, Agent, str]:
+    """Load the agent system from a JSON blueprint."""
     bp = Path(Prompt.ask("Blueprint JSON", default="system_blueprint.json")).expanduser()
     if not bp.exists():
         console.print(f"[red]Blueprint {bp} not found.")
@@ -168,10 +160,9 @@ def load_agent_system() -> Tuple[AgentSystem, Agent, str]:
     system = AgentSystem.load_from_json(str(bp))
     driver_name = Prompt.ask("Driver agent", choices=list(system.agents.keys()), default=list(system.agents)[0])
     driver = system.get_agent(driver_name)
-    instr = system.get_insturctions()
+    instr = system.get_instructions()
     return system, driver, instr
 
-# Smarter regex – matches inline/backtick/explicit styles
 _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
 
 def detect_delegation(msg: str) -> Optional[str]:
@@ -179,8 +170,8 @@ def detect_delegation(msg: str) -> Optional[str]:
     m = _DELEG_RE.search(msg)
     return f"delegate_to_{m.group(1)}" if m else None
 
-
 def api_alive(url: str, tries: int = 10) -> bool:
+    """Check if the API is responsive."""
     if is_exec_mode:
         return True
     for _ in range(tries):
@@ -194,7 +185,6 @@ def api_alive(url: str, tries: int = 10) -> bool:
 # ===========================================================================
 # 3 · Interactive *or* Automated loop
 # ===========================================================================
-
 def run(
     agent_system: AgentSystem,
     agent: Agent,
@@ -232,7 +222,7 @@ def run(
     )
 
     def build_system(a: Agent) -> str:
-        return roster_instr + "\n\n" + a.get_full_prompt() + "\n\n" + analysis_ctx
+        return roster_instr + "\n\n" + a.get_full_prompt(agent_system.global_policy) + "\n\n" + analysis_ctx
 
     history = [{"role": "system", "content": build_system(agent)}]
     history.append({"role": "user", "content": initial_user_message})
@@ -250,7 +240,6 @@ def run(
     current_agent = agent
     turn = 0
 
-    automatic = tries > 0
     tries_left = tries
 
     while True:
@@ -273,9 +262,19 @@ def run(
             if new_agent:
                 console.print(f"[yellow]🔄 Routing to '{tgt}' via {cmd}")
                 history.append({"role": "assistant", "content": f"🔄 Routing to **{tgt}** (command `{cmd}`)"})
+                
+                # INJECT LOADED CODE SAMPLES ON DELEGATION ---
+                if new_agent.code_samples:
+                    sample_context = "Here are some relevant code samples for your task:"
+                    for filename, code_content in new_agent.code_samples.items():
+                        sample_context += f"\n\n--- Sample from: {filename} ---\n"
+                        sample_context += f"```python\n{code_content.strip()}\n```"
+                    
+                    history.append({"role": "user", "content": sample_context})
+                    display(console, "user", sample_context) # Display for clarity
+
                 current_agent = new_agent
                 history.insert(0, {"role": "system", "content": build_system(new_agent)})
-                # no user interaction required – continue with same control-flow
                 continue
 
         # ── Inline code execution -------------------------------------------
@@ -308,15 +307,13 @@ def run(
             break
         # Simulate blank *continue* from the user
         history.append({"role": "user", "content": ""})
-        continue  # next OpenAI call immediately
+        continue
     console.print("Stopping sandbox…")
     mgr.stop_container()
-
 
 # ===========================================================================
 # 4 · Benchmarking helpers (modified to *return* results)
 # ===========================================================================
-
 def get_benchmark_module(console: Console, parent_dir: Path) -> Optional[Path]:
     """Prompt user to select a benchmark module."""
     benchmark_dir = parent_dir / "auto_metrics"
@@ -379,14 +376,12 @@ def run_benchmark(mgr, benchmark_module: Path, metadata: dict,
                 EXECUTE_ENDPOINT, json={"code": code_to_execute, "timeout": 300}, timeout=310
             ).json()
 
-        # Prepare display table
         table = Table(title="Benchmark Results")
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="magenta")
-
         stdout = exec_result.get("stdout", "")
         try:
-            result_dict = json.loads(stdout.strip().splitlines()[-1])  # Parse last printed line
+            result_dict = json.loads(stdout.strip().splitlines()[-1])
         except Exception as e:
             console.print(f"[yellow]Warning: Could not parse JSON from stdout: {e}[/yellow]")
             result_dict = {}
@@ -395,17 +390,15 @@ def run_benchmark(mgr, benchmark_module: Path, metadata: dict,
             for key, value in result_dict.items():
                 table.add_row(str(key), str(value))
             _save_benchmark_record(
-            run_id=f"{benchmark_module.stem}:{agent_name}:{int(time.time())}",
-            results=result_dict,
-            meta=metadata,
-            code=code_snippet,          # ← NEW
-        )
+                run_id=f"{benchmark_module.stem}:{agent_name}:{int(time.time())}",
+                results=result_dict,
+                meta=metadata,
+                code=code_snippet,
+            )
         else:
             table.add_row("Error", exec_result.get("stderr") or "An unknown error occurred.")
-
         console.print(table)
         return "Benchmark results:\n" + json.dumps(result_dict or {"error": "see console"})
-
     except Exception as exc:
         err_msg = f"Benchmark execution error: {exc}"
         console.print(f"[red]{err_msg}[/red]")
@@ -414,7 +407,6 @@ def run_benchmark(mgr, benchmark_module: Path, metadata: dict,
 # ===========================================================================
 # 5 · Entry point (collect *tries* & initial message)
 # ===========================================================================
-
 def main():
     load_dotenv(ENV_FILE)
     if not os.getenv("OPENAI_API_KEY"):
@@ -426,7 +418,6 @@ def main():
     benchmark_module = get_benchmark_module(console, PARENT_DIR)
     res = collect_resources(console, SANDBOX_RESOURCES_DIR)
 
-    # ── New prompts for automated mode -------------------------------------
     initial_user_message = Prompt.ask(
         "Initial user message", default="What should I do with this dataset?"
     )
@@ -449,7 +440,6 @@ def main():
         initial_user_message=initial_user_message,
         tries=tries,
     )
-
 
 if __name__ == "__main__":
     try:
