@@ -30,10 +30,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
-
-from benchmarking.prompt_testing.MultiAgentAutoTester import BACKEND_CHOICE
 from rich.table import Table
 from rich.prompt import Prompt
+
 BACKEND_CHOICE = Prompt.ask(
     "LLM backend",
     choices=["chatgpt", "ollama"],

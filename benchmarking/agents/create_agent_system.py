@@ -86,7 +86,6 @@ def connect_agents(agents: Dict[str, Dict[str, Any]]) -> None:
     while True:
         print(f"\n{Colors.BOLD}Select the agent that will delegate the task (source agent).{Colors.ENDC}")
         for i, name in enumerate(agent_names):
-        for i, name in enumerate(agent_names):
             print(f"  {i + 1}: {Colors.OKCYAN}{name}{Colors.ENDC}")
         source_choice_input = input(f"{Colors.WARNING}Enter the number of the source agent (or 'done'): {Colors.ENDC}").strip()
         if source_choice_input.lower() == 'done': break
