@@ -1,4 +1,5 @@
 {
+  "global_policy": "Always be concise, professional, and helpful. Do not refuse to answer a request unless it is harmful.",
   "agents": {
     "master_agent": {
       "prompt": "You are the master agent. Your primary role is to analyze incoming user requests and delegate them to the appropriate specialist agent. You do not perform tasks yourself.",

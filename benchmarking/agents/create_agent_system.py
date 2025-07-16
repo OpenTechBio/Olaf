@@ -15,6 +15,18 @@ class Colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+def define_global_policy() -> str:
+    """Asks the user to define a global policy for all agents."""
+    print(f"\n{Colors.OKBLUE}--- Global Policy Definition ---{Colors.ENDC}")
+    print("First, let's define a global policy. This is a set of general guidelines that all agents should follow.")
+    policy_prompt = f"{Colors.WARNING}Enter the global policy text (e.g., 'Always be concise and professional'): {Colors.ENDC}"
+    policy = input(policy_prompt).strip()
+    if not policy:
+        print(f"{Colors.OKCYAN}No global policy provided. Proceeding without one.{Colors.ENDC}")
+        return ""
+    print(f"{Colors.OKGREEN}Global policy set successfully.{Colors.ENDC}")
+    return policy
+
 def get_output_directory() -> str:
     """Asks the user for an output directory, with a default option."""
     default_dir = "benchmarking/agent_systems"
@@ -26,7 +38,7 @@ def define_agents() -> Dict[str, Dict[str, Any]]:
     """Guides the user through defining all agents and their prompts."""
     agents = {}
     print(f"\n{Colors.OKBLUE}--- Agent Definition ---{Colors.ENDC}")
-    print("Let's define your agents. Type 'done' when you have no more agents to add.")
+    print("Now, let's define your agents. Type 'done' when you have no more agents to add.")
 
     while True:
         prompt_text = f"\n{Colors.WARNING}Enter a unique name for the agent (e.g., 'master_agent') or 'done': {Colors.ENDC}"
@@ -87,7 +99,6 @@ def connect_agents(agents: Dict[str, Dict[str, Any]]) -> None:
         print(f"\nSelected source agent: '{Colors.OKCYAN}{source_agent_name}{Colors.ENDC}'")
         print(f"{Colors.BOLD}Select the agent to delegate to (target agent).{Colors.ENDC}")
         
-        # Create a list of valid target choices to check against
         valid_targets = []
         for i, name in enumerate(agent_names):
             if name != source_agent_name:
@@ -97,7 +108,6 @@ def connect_agents(agents: Dict[str, Dict[str, Any]]) -> None:
         target_choice_input = input(f"{Colors.WARNING}Enter the number of the target agent: {Colors.ENDC}").strip()
         try:
             target_idx = int(target_choice_input) - 1
-            # Adjust index for display vs. actual list of agents
             potential_target_name = agent_names[target_idx]
             if potential_target_name not in valid_targets:
                  raise ValueError
@@ -109,7 +119,6 @@ def connect_agents(agents: Dict[str, Dict[str, Any]]) -> None:
         delegation_command = input(f"{Colors.WARNING}Enter the delegation command name (e.g., 'delegate_to_coder'): {Colors.ENDC}").strip()
         description = input(f"{Colors.WARNING}Enter the description for this delegation to '{Colors.OKCYAN}{target_agent_name}{Colors.WARNING}': {Colors.ENDC}").strip()
 
-        # Add the neighbor connection to the source agent
         agents[source_agent_name]["neighbors"][delegation_command] = {
             "target_agent": target_agent_name,
             "description": description
@@ -117,12 +126,16 @@ def connect_agents(agents: Dict[str, Dict[str, Any]]) -> None:
         print(f"{Colors.OKGREEN}Successfully connected '{Colors.OKCYAN}{source_agent_name}{Colors.OKGREEN}' to '{Colors.OKCYAN}{target_agent_name}{Colors.OKGREEN}' via '{delegation_command}'.{Colors.ENDC}")
 
 
-def save_configuration(agents_config: Dict[str, Any], output_dir: str) -> None:
-    """Saves the final configuration to a JSON file."""
+def save_configuration(global_policy: str, agents_config: Dict[str, Any], output_dir: str) -> None:
+    """Saves the final configuration, including the global policy, to a JSON file."""
     if not agents_config:
         return 
 
-    final_structure = {"agents": agents_config}
+    # The final structure now includes the global_policy at the top level
+    final_structure = {
+        "global_policy": global_policy,
+        "agents": agents_config
+    }
     
     os.makedirs(output_dir, exist_ok=True)
 
@@ -144,13 +157,14 @@ def save_configuration(agents_config: Dict[str, Any], output_dir: str) -> None:
 def main():
     """Main function to run the interactive agent builder."""
     print(f"{Colors.HEADER}{Colors.BOLD}--- Welcome to the Interactive Agent Configuration Builder ---{Colors.ENDC}")
+
+    global_policy_text = define_global_policy()
     output_directory = get_output_directory()
-    
     agents_data = define_agents()
     
     if agents_data:
         connect_agents(agents_data)
-        save_configuration(agents_data, output_directory)
+        save_configuration(global_policy_text, agents_data, output_directory)
 
 if __name__ == "__main__":
     main()
