@@ -107,6 +107,28 @@ def collect_resources(console, sandbox_sources_dir) -> List[Tuple[Path, str]]:
         res.append((path, f"{sandbox_sources_dir}/{path.name}"))
     return res
 
+def load_bp_json(console) -> Path:
+    try:
+        #Attempt to create path from home directory or from current (assumed:benchmarking, Olaf) folder 
+        try_dirs = [
+            Path("~").expanduser() / 'Olaf' / 'benchmarking' / 'agents',
+            Path.cwd() / 'agents',
+            Path.cwd() / 'benchmarking' / 'agents'
+        ]
+        agents_dir = next((p for p in try_dirs if p.is_dir()), None)
+        if agents_dir:
+            agent_choices = [f.name for f in agents_dir.rglob("*.json")]
+            bp = Prompt.ask("Blueprint JSON", choices=agent_choices, default="system_blueprint.json")
+            bp = agents_dir / bp
+        else: 
+            bp = Path(Prompt.ask("Absolute path to Blueprint JSON", default="system_blueprint.json")).expanduser()
+        if not bp.exists():
+            raise FileNotFoundError
+        return bp
+    except FileNotFoundError: 
+        console.print(f"[red]Blueprint {bp} not found[/red]")
+        sys.exit(1)
+
 
 def format_execute_response(resp: dict, output_dir) -> str:
     lines = ["Code execution result:"]

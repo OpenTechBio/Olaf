@@ -57,7 +57,8 @@ from benchmarking.core.io_helpers import (
     select_dataset,
     collect_resources,
     get_initial_prompt,
-    format_execute_response
+    format_execute_response,
+    load_bp_json
 )
 from benchmarking.core.sandbox_management import (
     init_docker,
@@ -104,10 +105,7 @@ else:
 # ===========================================================================
 
 def load_agent_system() -> Tuple[AgentSystem, Agent, str]:
-    bp = Path(Prompt.ask("Blueprint JSON", default="system_blueprint.json")).expanduser()
-    if not bp.exists():
-        console.print(f"[red]Blueprint {bp} not found.")
-        sys.exit(1)
+    bp = load_bp_json(console)
     system = AgentSystem.load_from_json(str(bp))
     driver_name = Prompt.ask("Driver agent", choices=list(system.agents.keys()), default=list(system.agents)[0])
     driver = system.get_agent(driver_name)
