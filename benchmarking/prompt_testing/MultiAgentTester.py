@@ -137,7 +137,7 @@ def api_alive(url: str, tries: int = 10) -> bool:
 # 3 · Interactive loop
 # ===========================================================================
 
-def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Path, metadata: dict, resources: List[Tuple[Path, str]], benchmark_module: Optional[Path] = None):
+def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Path, metadata: dict, resources: List[Tuple[Path, str]], benchmark_modules: Optional[list[Path]] = None):
     mgr = _BackendManager()
     console.print(f"Launching sandbox ({backend})…")
 
@@ -214,7 +214,7 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
             display(console, "user", feedback)
             
         def input_loop():
-            if benchmark_module:
+            if benchmark_modules:
                 console.print("\n[bold]Next message (blank = continue, 'benchmark' to run benchmarks, 'exit' to quit):[/bold]")
             else:
                 console.print("\n[bold]Next message (blank = continue, 'exit' to quit):[/bold]")
@@ -224,8 +224,9 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
                 user_in = "exit"
             if user_in.lower() in {"exit", "quit"}:
                 return "break"
-            if user_in.lower() == "benchmark" and benchmark_module:
-                run_benchmark(mgr, benchmark_module)
+            if user_in.lower() == "benchmark" and benchmark_modules:
+                for benchmark_module in benchmark_modules:
+                    run_benchmark(mgr, benchmark_module)
                 input_loop()  # Recurse to continue the loop after benchmarks
             if user_in:
                 history.append({"role": "user", "content": user_in})
@@ -242,7 +243,7 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
 # 4 · Benchmarking
 # ===========================================================================
 
-def get_benchmark_module(console: Console, parent_dir: Path) -> Optional[Path]:
+def get_benchmark_modules(console: Console, parent_dir: Path) -> Optional[list[Path]]:
     """
     Prompts the user to select a benchmark module from the available ones.
     Returns the path to the selected module or None if no selection is made.
@@ -252,31 +253,38 @@ def get_benchmark_module(console: Console, parent_dir: Path) -> Optional[Path]:
         console.print("[red]No benchmarks directory found.[/red]")
         return None
 
-    modules = list(benchmark_dir.glob("*.py"))
+    module_names = list(benchmark_dir.glob("*.py"))
     # remove AutoMetric.py from modules (it is the base class)
-    modules = [m for m in modules if m.name != "AutoMetric.py"]
-    if not modules:
+    module_names = [m for m in module_names if m.name != "AutoMetric.py"]
+    if not module_names:
         console.print("[red]No benchmark modules found.[/red]")
         return None
 
     console.print("\n[bold]Available benchmark modules:[/bold]")
-    for i, mod in enumerate(modules, start=1):
+    for i, mod in enumerate(module_names, start=1):
         console.print(f"{i}. {mod.name}")
-
-    choice = Prompt.ask("Select a benchmark module by number (or press Enter to skip)", default="")
-    if not choice:
+    console.print(f"{len(module_names)+1}. Select All")
+    choices = Prompt.ask("Select benchmark modules by number  (e.g. 1 2 3 or 1,2,3) (or press Enter to skip)", default="")
+    choices = re.split(r'[,\s]+', choices) #User input must be seperated by commas or spaces 
+    
+    if not choices or choices == ['']:
         return None
 
-    try:
-        index = int(choice) - 1
-        if 0 <= index < len(modules):
-            return modules[index]
-        else:
-            console.print("[red]Invalid selection.[/red]")
+    modules = []
+    for choice in choices:
+        try: 
+            index = int(choice) - 1
+            if index == len(module_names): #Handles select all case 
+                return module_names
+            elif 0 <= index < len(module_names): 
+                modules.append(module_names[index])
+            else:
+                console.print("[red]Invalid selection.[/red]")
+                return None
+        except ValueError:
+            console.print("[red]Invalid input. Please enter a number.[/red]")
             return None
-    except ValueError:
-        console.print("[red]Invalid input. Please enter a number.[/red]")
-        return None
+    return modules 
     
 def run_benchmark(mgr, benchmark_module: str):
     """
@@ -346,9 +354,9 @@ def main():
 
     sys, drv, roster = load_agent_system()
     dp, meta = select_dataset(console, DATASETS_DIR)
-    benchmark_module = get_benchmark_module(console, PARENT_DIR)
+    benchmark_modules = get_benchmark_modules(console, PARENT_DIR)
     res = collect_resources(console, SANDBOX_RESOURCES_DIR)
-    run(sys, drv, roster, dp, meta, res, benchmark_module)
+    run(sys, drv, roster, dp, meta, res, benchmark_modules)
 
 
 if __name__ == "__main__":

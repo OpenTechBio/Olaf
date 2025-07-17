@@ -124,11 +124,11 @@ def load_bp_json(console) -> Path:
             bp = Path(Prompt.ask("Absolute path to Blueprint JSON", default="system_blueprint.json")).expanduser()
         if not bp.exists():
             raise FileNotFoundError
-        return bp
     except FileNotFoundError: 
         console.print(f"[red]Blueprint {bp} not found[/red]")
         sys.exit(1)
-
+    else:
+        return bp
 
 def format_execute_response(resp: dict, output_dir) -> str:
     lines = ["Code execution result:"]
