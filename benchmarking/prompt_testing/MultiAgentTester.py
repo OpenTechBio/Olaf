@@ -30,19 +30,30 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
-
 from rich.table import Table
+from rich.prompt import Prompt
+
+BACKEND_CHOICE = Prompt.ask(
+    "LLM backend",
+    choices=["chatgpt", "ollama"],
+    default="chatgpt",
+)
+OLLAMA_HOST = "http://localhost:11434"
+if BACKEND_CHOICE == "ollama":
+    OLLAMA_HOST = Prompt.ask(
+        "Ollama base URL",
+        default="http://localhost:11434",
+    )
 # ── Dependencies ------------------------------------------------------------
 try:
     from dotenv import load_dotenv
     from openai import OpenAI, APIError
     import requests
     from rich.console import Console
-    from rich.prompt import Prompt
+
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
     sys.exit(1)
-
 # ── Agent framework ---------------------------------------------------------
 try:
     from benchmarking.agents.AgentSystem import AgentSystem, Agent
@@ -79,7 +90,7 @@ SANDBOX_RESOURCES_DIR = "/workspace/resources"
 # ===========================================================================
 # 1 · Backend selection
 # ===========================================================================
-backend = Prompt.ask("Choose backend", choices=["docker", "singularity", "singularity-exec"], default="docker")
+backend = Prompt.ask("Choose sandbox backend", choices=["docker", "singularity", "singularity-exec"], default="docker")
 force_refresh = Prompt.ask("Force refresh environment?", choices=["y", "n"], default="n").lower() == "y"
 is_exec_mode = backend == "singularity-exec"
 
@@ -109,7 +120,7 @@ def load_agent_system() -> Tuple[AgentSystem, Agent, str]:
     system = AgentSystem.load_from_json(str(bp))
     driver_name = Prompt.ask("Driver agent", choices=list(system.agents.keys()), default=list(system.agents)[0])
     driver = system.get_agent(driver_name)
-    instr = system.get_insturctions()
+    instr = system.get_instructions()
     return system, driver, instr
 
 # Smarter regex – matches inline/backtick/explicit styles
@@ -161,7 +172,7 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
     )
 
     def build_system(a: Agent) -> str:
-        return roster_instr + "\n\n" + a.get_full_prompt() + "\n\n" + analysis_ctx
+        return roster_instr + "\n\n" + a.get_full_prompt(agent_system.global_policy) + "\n\n" + analysis_ctx
 
     history = [{"role": "system", "content": build_system(agent)}]
     first_user = "Beginning interactive session. You can ask questions or give commands."
@@ -169,7 +180,14 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
     display(console, "system", history[0]["content"])
     display(console, "user", first_user)
 
-    openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    if BACKEND_CHOICE == "chatgpt":
+        if not os.getenv("OPENAI_API_KEY"):
+            console.print("[red]OPENAI_API_KEY not set in .env")
+            sys.exit(1)
+        openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    else:
+        # Local Ollama needs no key; model defaults to “llama2”
+        openai = OpenAI(host=OLLAMA_HOST)
     current_agent = agent
     turn = 0
 
@@ -192,6 +210,17 @@ def run(agent_system: AgentSystem, agent: Agent, roster_instr: str, dataset: Pat
             if new_agent:
                 console.print(f"[yellow]🔄 Routing to '{tgt}' via {cmd}")
                 history.append({"role": "assistant", "content": f"🔄 Routing to **{tgt}** (command `{cmd}`)"})
+                  
+                # INJECT LOADED CODE SAMPLES ON DELEGATION ---
+                if new_agent.code_samples:
+                    sample_context = "Here are some relevant code samples for your task:"
+                    for filename, code_content in new_agent.code_samples.items():
+                        sample_context += f"\n\n--- Sample from: {filename} ---\n"
+                        sample_context += f"```python\n{code_content.strip()}\n```"
+                    
+                    history.append({"role": "user", "content": sample_context})
+                    display(console, "user", sample_context) # Display for clarity
+
                 current_agent = new_agent
                 history.insert(0, {"role": "system", "content": build_system(new_agent)})
                 continue

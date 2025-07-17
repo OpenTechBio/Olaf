@@ -6,3 +6,5 @@ outputs/
 *agent_systems/
 agent_systems/
 *.pyc
+**/*.pyc
+bin/
