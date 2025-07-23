@@ -60,6 +60,7 @@ from benchmarking.core.io_helpers import (
     collect_resources,
     get_initial_prompt,
     format_execute_response,
+    load_bp_json
 )
 from benchmarking.core.sandbox_management import (
     init_docker,
@@ -153,7 +154,7 @@ else:
 # ===========================================================================
 def load_agent_system() -> Tuple[AgentSystem, Agent, str]:
     """Load the agent system from a JSON blueprint."""
-    bp = Path(Prompt.ask("Blueprint JSON", default="system_blueprint.json")).expanduser()
+    bp = load_bp_json(console)
     if not bp.exists():
         console.print(f"[red]Blueprint {bp} not found.")
         sys.exit(1)
