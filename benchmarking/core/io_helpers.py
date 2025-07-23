@@ -13,8 +13,6 @@ import textwrap
 import base64
 from datetime import datetime
 
-
-
 def extract_python_code(txt: str) -> Optional[str]:
     """Return the *first* fenced code block, or None if absent.
 
@@ -108,27 +106,47 @@ def collect_resources(console, sandbox_sources_dir) -> List[Tuple[Path, str]]:
     return res
 
 def load_bp_json(console) -> Path:
-    try:
-        #Attempt to create path from home directory or from current (assumed:benchmarking, Olaf) folder 
-        try_dirs = [
-            Path("~").expanduser() / 'Olaf' / 'benchmarking' / 'agents',
-            Path.cwd() / 'agents',
-            Path.cwd() / 'benchmarking' / 'agents'
-        ]
-        agents_dir = next((p for p in try_dirs if p.is_dir()), None)
-        if agents_dir:
-            agent_choices = [f.name for f in agents_dir.rglob("*.json")]
-            bp = Prompt.ask("Blueprint JSON", choices=agent_choices, default="system_blueprint.json")
-            bp = agents_dir / bp
-        else: 
-            bp = Path(Prompt.ask("Absolute path to Blueprint JSON", default="system_blueprint.json")).expanduser()
-        if not bp.exists():
-            raise FileNotFoundError
-    except FileNotFoundError: 
-        console.print(f"[red]Blueprint {bp} not found[/red]")
+    """
+    Try to find a blueprint JSON file from common locations.
+    If multiple are found, prompt user to choose or enter manual path.
+    """
+    search_paths = [
+        Path.home() / "Olaf" / "benchmarking" / "agents",
+        Path.cwd() / "benchmarking" / "agents",
+        Path.cwd() / "agents"
+    ]
+
+    # Search for JSON files in known paths
+    for path in search_paths:
+        if path.is_dir():
+            json_files = list(path.rglob("*.json"))
+            if json_files:
+                choices = [f.name for f in json_files]
+                choices.append("manual")
+
+                choice = Prompt.ask(
+                    "Select a blueprint JSON file or choose 'manual' to enter path",
+                    choices=choices,
+                    default="system_blueprint.json"
+                )
+                if choice == "manual":
+                    break  # jump to manual path section
+                selected = path / choice
+                if selected.exists():
+                    return selected
+
+    # Manual fallback
+    user_path = Prompt.ask(
+        "Please provide absolute or relative path to blueprint JSON",
+        default="~/system_blueprint.json"
+    )
+    bp = Path(user_path).expanduser()
+
+    if not bp.exists():
+        console.print(f"[red]Blueprint file not found at: {bp}[/red]")
         sys.exit(1)
-    else:
-        return bp
+
+    return bp
 
 def format_execute_response(resp: dict, output_dir) -> str:
     lines = ["Code execution result:"]
