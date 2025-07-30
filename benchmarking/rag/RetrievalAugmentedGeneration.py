@@ -1,15 +1,25 @@
-import os
-import urllib.request
+from os import path
+from urllib.request import urlopen
 from urllib.error import URLError
-import chromadb
-from chromadb.utils import embedding_functions
+from chromadb import Client
+from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import validators
+from validators import url as is_url
 
+
+
+"""
+Fixes to make for the RAG model:
+1. Think about altering collections to be class variables shared by all instances of the class
+2. Think about adding some functions that allow the user to play around with diff settings for text
+splitting and embedding distance calculations 
+3. Is web parsing happening accurately? 
+4. Can I spice up the custom error for expanded functionality?
+"""
 class RetrievalAugmentedGeneration:
     def __init__(self):
-        self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
-        self.client = chromadb.Client()
+        self.embedding_fn = DefaultEmbeddingFunction()
+        self.client = Client()
         self.collection = self.client.get_or_create_collection(
             name="OLAF_collection", 
             embedding_function=self.embedding_fn, 
@@ -35,14 +45,22 @@ class RetrievalAugmentedGeneration:
 
     def load_url(self, url):
         try:
-            contents = urllib.request.urlopen(url)
-            contents = contents.read().decode('utf-8')
-            if not contents:
-                raise URLError("Empty URL")
-            return contents
-        except URLError as e:
-            print(f"{e}")
-            return ""
+            response = requests.get("https://api.example.com/data")
+            data = response.json()
+            if not data:
+                raise Exception
+            return data
+        except Exception:
+            try:
+                contents = urlopen(url)
+                contents = contents.read().decode('utf-8')
+                if not contents:
+                    raise URLError("Empty URL")
+                return contents
+            except URLError as e:
+                print(f"Failed to fetch via urlopen: {e}")
+                return ""
+
 
     @property
     def docs(self):
@@ -50,11 +68,11 @@ class RetrievalAugmentedGeneration:
 
     @docs.setter
     def docs(self, file_name_or_url):
-        if os.path.isfile(file_name_or_url):
+        if path.isfile(file_name_or_url):
             file_contents = self.load_file(file_name_or_url)
             if file_contents:
                 self._docs.append(file_contents)
-        elif validators.url(file_name_or_url):
+        elif is_url(file_name_or_url):
             url_contents = self.load_url(file_name_or_url)
             if url_contents:
                 self._docs.append(url_contents)
@@ -76,5 +94,3 @@ class RetrievalAugmentedGeneration:
             self.docs = file_name_or_url
         self.add_to_collection(self.chunks())
         return self.query(query, n_results)
-
-
