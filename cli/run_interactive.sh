@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# move *out* of cli/ into its parent (Olaf/)
+cd "$(dirname "$0")"/..
+python -m cli.prompt_testing.MultiAgentTester "$@"

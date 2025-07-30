@@ -17,7 +17,7 @@ class Colors:
     UNDERLINE = '\033[4m'
 
 # Define the directory where code samples are stored
-CODE_SAMPLES_DIR = Path("benchmarking/code_samples")
+CODE_SAMPLES_DIR = Path("cli/code_samples")
 
 def define_global_policy() -> str:
     """Asks the user to define a global policy for all agents."""
@@ -33,7 +33,7 @@ def define_global_policy() -> str:
 
 def get_output_directory() -> str:
     """Asks the user for an output directory, with a default option."""
-    default_dir = "benchmarking/agent_systems"
+    default_dir = "cli/agent_systems"
     dir_prompt = f"{Colors.WARNING}Enter the output directory (press Enter to use '{default_dir}'): {Colors.ENDC}"
     user_input = input(dir_prompt).strip()
     return user_input or default_dir

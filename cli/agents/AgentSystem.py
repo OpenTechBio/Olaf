@@ -2,7 +2,7 @@ import json
 from typing import Dict, Optional
 from pathlib import Path
 
-CODE_SAMPLES_DIR = Path("benchmarking/code_samples")
+CODE_SAMPLES_DIR = Path("cli/code_samples")
 
 
 class Command:
