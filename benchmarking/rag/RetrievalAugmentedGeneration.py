@@ -1,16 +1,24 @@
-import requests
-from os import path
 import uuid
-import chromadb
-import langchain
+from os import path
 from urllib.request import urlopen
 from urllib.error import URLError
-from validators import url as is_url
-import chromadb.utils.embedding_functions as ef
-import langchain.text_splitter as txt_splitter
 from pathlib import Path
 
+# ── Dependencies ------------------------------------------------------------
+try:
+    import requests
+    import chromadb
+    import langchain
+    import chromadb.utils.embedding_functions as ef
+    import langchain.text_splitter as txt_splitter
+    from validators import url as is_url
+    from rich.console import Console
+except ImportError as e:
+    print(f"Missing dependency: {e}", file=sys.stderr)
+    sys.exit(1)
+
 # ── Collections Directory ---------------------------------------------------------
+console = Console()
 SCRIPT_DIR = Path(__file__).resolve().parent
 PARENT_DIR = SCRIPT_DIR.parent
 COLLECTION_DIR = PARENT_DIR / "rag" / "collections"
@@ -38,8 +46,8 @@ class RetrievalAugmentedGeneration:
                 metadata={"hnsw:space": distance_metric}
             )
         except Exception as e:
-            print(f"Failed to create collection '{collection_name}' with embedding function {embedding_fn} and distance '{distance_metric}': {e}")
-            print("Reverting to default configuration")
+            console.print(f"[red] Failed to create collection '{collection_name}' with embedding function {embedding_fn} and distance '{distance_metric}': {e}")
+            console.print(f"[yellow]🔄 Reverting to default configuration")
             self.collection = self.client.get_or_create_collection(name="OLAF")
 
         self.text_splitter = txt_splitter.RecursiveCharacterTextSplitter(
@@ -58,7 +66,7 @@ class RetrievalAugmentedGeneration:
                     raise FileNotFoundError("Empty or Invalid file")
                 return contents
         except FileNotFoundError as e:
-            print(f"{e}")
+            console.print(f"[red] {e}")
             return ""
 
     def load_url(self, url: str) -> str:
@@ -76,7 +84,7 @@ class RetrievalAugmentedGeneration:
                     raise URLError("Empty or Invalid URL")
                 return contents
             except Exception as e:
-                print(f"Failed to fetch via requests and urlopen: {e}")
+                console.print(f"[red] Failed to fetch via requests and urlopen: {e}")
                 return ""
 
     @property
@@ -89,23 +97,41 @@ class RetrievalAugmentedGeneration:
             file_contents = self.load_file(file_name_or_url)
             if file_contents and file_contents not in self._docs:
                 self._docs.append(file_contents)
-                print(f"Loaded file: {file_name_or_url}")
+                console.print(f"[green] Loaded file: {file_name_or_url}")
         elif is_url(file_name_or_url):
             url_contents = self.load_url(file_name_or_url)
             if url_contents and url_contents not in self._docs:
                 self._docs.append(url_contents)
-                print(f"Loaded URL: {file_name_or_url}")
+                console.print(f"[green] Loaded URL: {file_name_or_url}")
         else:
-            print("Could not find valid URL or file")
+            console.print(f"[red]Could not find valid URL or file")
 
     def add_to_collection(self, file_name_or_url: str, n_results: int = 1):
         self.docs = file_name_or_url
+        if self.retrieve_doc_by_source(file_name_or_url): #check if source already exists 
+            console.print(f"[yellow] Redirecting ... Source exists {file_name_or_url}")
+            return 
         chunks = self.text_splitter.create_documents(self._docs)
         chunks = [chunk.page_content for chunk in chunks]
-
+        metadatas = [{"source": file_name_or_url} for _ in range(len(chunks))]
         ids = [str(uuid.uuid4()) for _ in range(len(chunks))]
+        self.collection.add(documents=chunks, ids=ids, metadatas=metadatas)
 
-        self.collection.add(documents=chunks, ids=ids)
+    def retrieve_doc_by_source(self, source: str)->list[str]:
+        documents = self.collection.query(
+            query_texts=[""],
+            n_results=1,
+            where={"source": file_name_or_url}
+        )
+        return documents 
+        
+    def retrieve_doc_by_id(self, ids: int)->list[str]:
+        documents = self.collection.query(
+            query_texts=[""],
+            n_results=1,
+            ids=ids
+        )
+        return documents 
 
     def query(self, query: str, n_results: int = 1):
         return self.collection.query(query_texts=[query], n_results=n_results)
