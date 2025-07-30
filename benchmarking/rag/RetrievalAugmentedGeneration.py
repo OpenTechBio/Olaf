@@ -3,6 +3,7 @@ from os import path
 from urllib.request import urlopen
 from urllib.error import URLError
 from pathlib import Path
+import sys
 
 # ── Dependencies ------------------------------------------------------------
 try:
@@ -24,6 +25,7 @@ PARENT_DIR = SCRIPT_DIR.parent
 COLLECTION_DIR = PARENT_DIR / "rag" / "collections"
 
 class RetrievalAugmentedGeneration:
+    client = chromadb.HttpClient(host="YOUR_SERVER_IP", port=8000)
     def __init__(self,
                  embedding_fn=None,
                  collection_name="OLAF",
@@ -32,15 +34,9 @@ class RetrievalAugmentedGeneration:
                  chunk_size=600,
                  chunk_overlap=50):
 
-        # Persistent Collection is retained on disk memory if directory found, else, create temporary client
-        if COLLECTION_DIR.is_dir():
-            self.client = chromadb.PersistentClient(path=str(COLLECTION_DIR))
-        else:
-            self.client = chromadb.Client()
-
         # Implement with User Parameters
         try:
-            self.collection = self.client.get_or_create_collection(
+            self.collection = RetrievalAugmentedGeneration.client.get_or_create_collection(
                 name=collection_name,
                 embedding_function=embedding_fn or ef.DefaultEmbeddingFunction(),
                 metadata={"hnsw:space": distance_metric}
@@ -48,7 +44,7 @@ class RetrievalAugmentedGeneration:
         except Exception as e:
             console.print(f"[red] Failed to create collection '{collection_name}' with embedding function {embedding_fn} and distance '{distance_metric}': {e}")
             console.print(f"[yellow]🔄 Reverting to default configuration")
-            self.collection = self.client.get_or_create_collection(name="OLAF")
+            self.collection = RetrievalAugmentedGeneration.client.get_or_create_collection(name="OLAF")
 
         self.text_splitter = txt_splitter.RecursiveCharacterTextSplitter(
             separators=seperators,
@@ -121,11 +117,11 @@ class RetrievalAugmentedGeneration:
         documents = self.collection.query(
             query_texts=[""],
             n_results=1,
-            where={"source": file_name_or_url}
+            where={"source": source}
         )
         return documents 
         
-    def retrieve_doc_by_id(self, ids: int)->list[str]:
+    def retrieve_doc_by_id(self, ids: list[str)->list[str]:
         documents = self.collection.query(
             query_texts=[""],
             n_results=1,
