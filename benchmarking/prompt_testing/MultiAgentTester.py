@@ -61,13 +61,6 @@ except ImportError:
     print("[ERROR] Could not import backend.agents.agent_system", file=sys.stderr)
     raise
 
-# ── RAG framework -----------------------------------------------------------
-try:
-    from benchmarking.rag.RetrievalAugmentedGeneration import RetrievalAugmentedGeneration as RAG
-except ImportError:
-    print("[ERROR] Could not import backend.rag", file=sys.stderr)
-    raise
-
 # ── Local helpers -----------------------------------------------------------
 from benchmarking.core.io_helpers import (
     extract_python_code,
