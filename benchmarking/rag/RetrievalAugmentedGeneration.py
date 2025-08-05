@@ -20,10 +20,8 @@ except ImportError as e:
 # ── Paths and Constants ─────────────────────────────────────────────
 console = Console()
 SCRIPT_DIR = Path(__file__).resolve().parent
-PARENT_DIR = SCRIPT_DIR.parent
-EMBEDDING_DIR = PARENT_DIR / "benchmarking" / "rag"
-EMBEDDING_FILE = EMBEDDING_DIR / "embeddings.json"
-FUNCTIONS_FILE = EMBEDDING_DIR / "functions.json"
+EMBEDDING_FILE = SCRIPT_DIR / "embeddings.json"
+FUNCTIONS_FILE = SCRIPT_DIR / "functions.json"
 
 # ──────Class──────────────────────────────────────────────────────────
 class RetrievalAugmentedGeneration:
@@ -31,7 +29,7 @@ class RetrievalAugmentedGeneration:
 
     def __init__(self):
         self.embeddings = self.load_embeddings()
-        self.functions, self.urls = self.load_functions_and_urls()
+        self.functions = self.load_functions()
         self.query_history = []
 
     def extract_scib(self, url):
@@ -50,17 +48,13 @@ class RetrievalAugmentedGeneration:
         func_def = func_sig.get_text(strip=True)
         descr_tag = func_sig.find_next_sibling("dd")
         func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
-
+        func = {"source": url, "definition": func_def, "description": func_descr} 
         try:
             with open(FUNCTIONS_FILE, "a") as f:
-                f.write(json.dumps({
-                    "source": url,
-                    "definition": func_def,
-                    "description": func_descr
-                }) + "\n")
+                f.write(json.dumps(func) + "\n")
         except Exception as e:
             console.log(f"[red]Failed to write to FUNCTIONS_FILE: {e}")
-
+        self.functions.append(func)
         return func_def, func_descr
 
     def load_embeddings(self):
@@ -74,42 +68,39 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Embeddings file not found.")
         return embeddings
 
-    def load_functions_and_urls(self):
+    def load_functions(self):
         functions = []
-        urls = []
         try:
             with open(FUNCTIONS_FILE, "r") as f:
                 for line in f:
                     function = json.loads(line.strip())
-                    functions.append(function["definition"])
-                    urls.append(function["source"])
+                    functions.append(function)
         except FileNotFoundError:
             console.log("[red]Functions file not found.")
-        return functions, urls
+        return functions
 
-    def create_embeddings(self, texts):
-        embeddings = self.model.encode(texts if isinstance(texts, list) else [texts])
+    def create_embeddings(self, text:str):
+        embeddings = self.model.encode([text])[0]
         try:
             with open(EMBEDDING_FILE, "a") as f:
-                for emb in embeddings:
-                    f.write(json.dumps(emb.tolist()) + "\n")
-            self.embeddings.extend([np.array(emb) for emb in embeddings])
+                f.write(json.dumps(embeddings.tolist()) + "\n")
+            self.embeddings.append(embeddings)
             console.print(f"[green]Embeddings successfully stored in {EMBEDDING_FILE}")
         except Exception as e:
             console.print(f"[red]Failed to create embeddings: {e}")
 
     def url_exists(self, source):
-        for url in self.urls:
-            if url == source:
+        for f in self.functions:
+            if source == f["source"]:
                 return True
         return False 
 
     def find_by_source(self, url):
-        for idx, source in enumerate(self.urls):
-            if source == url:
-                return self.functions[idx]
+        for idx, f in enumerate(self.functions):
+            if f["source"] == url:
+                return f["definition"], f["description"]
         console.log("URL not found")
-        return ""
+        return None
 
     @staticmethod
     def cosine_similarity(A, B):
@@ -132,7 +123,8 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.bras.html"
-    func_def, func_descr = rag.extract_scib(url)
-    rag.create_embeddings([func_def])
+    if not rag.url_exists(url):
+        func_def, func_descr = rag.extract_scib(url)
+        rag.create_embeddings(func_def)
     result = rag.query("What is scib?")
     console.print(result)
