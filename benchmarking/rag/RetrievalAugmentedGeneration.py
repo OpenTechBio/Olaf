@@ -32,6 +32,10 @@ class RetrievalAugmentedGeneration:
         self.functions = self.load_functions()
         self.query_history = []
 
+    def view_history(self):
+        print("Query history:", self.query_history)
+        return self.query_history
+
     def extract_scib(self, url):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -51,7 +55,7 @@ class RetrievalAugmentedGeneration:
         except Exception as e:
             console.log(f"[red]Failed to write to FUNCTIONS_FILE: {e}")
         self.functions.append(func)
-        return func_def, f
+        return func
 
     def load_embeddings(self):
         embeddings = []
@@ -75,7 +79,7 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Functions file not found.")
         return functions
 
-    def create_embeddings(self, url, text:str):
+    def create_embeddings(self, text:str):
         embeddings = self.model.encode([text])[0]
         try:
             with open(EMBEDDING_FILE, "a", encoding="utf-8") as f:
@@ -94,7 +98,7 @@ class RetrievalAugmentedGeneration:
     def find_by_source(self, url):
         for idx, f in enumerate(self.functions):
             if f["source"] == url:
-                return f["definition"], f["description"]
+                return f
         console.log("URL not found")
         return None
 
@@ -118,11 +122,26 @@ class RetrievalAugmentedGeneration:
 # ── Example ─────────────────────────────────────────────
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
-    url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.bras.html"
-    if not rag.url_exists(url):
-        func_def, func = rag.extract_scib(url)
-        rag.create_embeddings(url, func_def)
-    result = rag.query("What is scib?")
-    console.print(result)
-    
-    print(rag.functions)
+    urls = [
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.ari.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.nmi.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.asw_label.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.asw_label.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.graph_connectivity.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.kbet.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.lisi.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.nmi_ari_cluster_labels_kmeans.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.bras.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.benchmark.html",
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.normalized_score.html"
+    ]
+    for url in urls[:5]:
+        if not rag.url_exists(url):
+            func = rag.extract_scib(url)
+            if func and func["description"]:
+                rag.create_embeddings(func["description"])
+        else:
+            func = rag.find_by_source(url)
+    console.print(rag.embeddings)
+    result = rag.query("What is ari?")
+    console.print("Response to the query is", result)
