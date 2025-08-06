@@ -33,10 +33,6 @@ class RetrievalAugmentedGeneration:
         self.query_history = []
 
     def extract_scib(self, url):
-        if self.url_exists(url):
-            console.log("URL already exists")
-            return self.find_by_source(url)
-
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -80,9 +76,6 @@ class RetrievalAugmentedGeneration:
         return functions
 
     def create_embeddings(self, url, text:str):
-        if self.url_exists(url):
-            console.log("Embedding already exists")
-            return 
         embeddings = self.model.encode([text])[0]
         try:
             with open(EMBEDDING_FILE, "a", encoding="utf-8") as f:
@@ -126,8 +119,9 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.bras.html"
-    func_def, func = rag.extract_scib(url)
-    rag.create_embeddings(url, func_def)
+    if not rag.url_exists(url):
+        func_def, func = rag.extract_scib(url)
+        rag.create_embeddings(url, func_def)
     result = rag.query("What is scib?")
     console.print(result)
     
