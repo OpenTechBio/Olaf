@@ -55,7 +55,7 @@ class RetrievalAugmentedGeneration:
         except Exception as e:
             console.log(f"[red]Failed to write to FUNCTIONS_FILE: {e}")
         self.functions.append(func)
-        return func_def, func_descr
+        return func_def, f
 
     def load_embeddings(self):
         embeddings = []
@@ -80,6 +80,8 @@ class RetrievalAugmentedGeneration:
         return functions
 
     def create_embeddings(self, text:str):
+        if self.url_exists(url):
+            console.log("Embedding already exists")
         embeddings = self.model.encode([text])[0]
         try:
             with open(EMBEDDING_FILE, "a") as f:
@@ -123,8 +125,7 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.bras.html"
-    if not rag.url_exists(url):
-        func_def, func_descr = rag.extract_scib(url)
-        rag.create_embeddings(func_def)
+    func_def, func = rag.extract_scib(url)
+    rag.create_embeddings(func_def)
     result = rag.query("What is scib?")
     console.print(result)
