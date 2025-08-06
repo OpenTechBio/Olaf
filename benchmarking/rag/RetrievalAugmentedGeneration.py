@@ -50,7 +50,7 @@ class RetrievalAugmentedGeneration:
         func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
         func = {"source": url, "definition": func_def, "description": func_descr} 
         try:
-            with open(FUNCTIONS_FILE, "a") as f:
+            with open(FUNCTIONS_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(func) + "\n")
         except Exception as e:
             console.log(f"[red]Failed to write to FUNCTIONS_FILE: {e}")
@@ -60,7 +60,7 @@ class RetrievalAugmentedGeneration:
     def load_embeddings(self):
         embeddings = []
         try:
-            with open(EMBEDDING_FILE, "r") as f:
+            with open(EMBEDDING_FILE, "r", encoding="utf-8") as f:
                 for line in f:
                     embedding = json.loads(line.strip())
                     embeddings.append(np.array(embedding))
@@ -71,7 +71,7 @@ class RetrievalAugmentedGeneration:
     def load_functions(self):
         functions = []
         try:
-            with open(FUNCTIONS_FILE, "r") as f:
+            with open(FUNCTIONS_FILE, "r", encoding="utf-8") as f:
                 for line in f:
                     function = json.loads(line.strip())
                     functions.append(function)
@@ -79,12 +79,13 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Functions file not found.")
         return functions
 
-    def create_embeddings(self, text:str):
+    def create_embeddings(self, url, text:str):
         if self.url_exists(url):
             console.log("Embedding already exists")
+            return 
         embeddings = self.model.encode([text])[0]
         try:
-            with open(EMBEDDING_FILE, "a") as f:
+            with open(EMBEDDING_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(embeddings.tolist()) + "\n")
             self.embeddings.append(embeddings)
             console.print(f"[green]Embeddings successfully stored in {EMBEDDING_FILE}")
@@ -126,6 +127,8 @@ if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.bras.html"
     func_def, func = rag.extract_scib(url)
-    rag.create_embeddings(func_def)
+    rag.create_embeddings(url, func_def)
     result = rag.query("What is scib?")
     console.print(result)
+    
+    print(rag.functions)
