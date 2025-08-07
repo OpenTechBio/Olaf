@@ -41,8 +41,13 @@ class RetrievalAugmentedGeneration:
         try:
             with open(EMBEDDING_FILE, "r", encoding="utf-8") as f:
                 for line in f:
-                    embedding = json.loads(line.strip())
-                    embeddings.append(np.array(embedding))
+                    if not line.strip():
+                        continue 
+                    try:
+                        embedding = json.loads(line.strip())
+                        embeddings.append(np.array(embedding))
+                    except json.JSONDecodeError:
+                        console.print(f"[red] Invalid embedding line skipped: {line}")
         except FileNotFoundError:
             console.log("[red]Embeddings file not found.")
         return embeddings
@@ -52,8 +57,13 @@ class RetrievalAugmentedGeneration:
         try:
             with open(FUNCTIONS_FILE, "r", encoding="utf-8") as f:
                 for line in f:
-                    function = json.loads(line.strip())
-                    functions.append(function)
+                    if not line.strip():
+                        continue 
+                    try:
+                        function = json.loads(line.strip())
+                        functions.append(function)
+                    except json.JSONDecodeError:
+                        console.print(f"[red] Invalid embedding line skipped: {line}")
         except FileNotFoundError:
             console.log("[red]Functions file not found.")
         return functions
