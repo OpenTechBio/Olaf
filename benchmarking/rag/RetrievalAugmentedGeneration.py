@@ -21,8 +21,8 @@ except ImportError as e:
 # ── Paths and Constants ─────────────────────────────────────────────
 console = Console()
 SCRIPT_DIR = Path(__file__).resolve().parent
-EMBEDDING_FILE = SCRIPT_DIR / "embeddings.json"
-FUNCTIONS_FILE = SCRIPT_DIR / "functions.json"
+EMBEDDING_FILE = SCRIPT_DIR / "embeddings.jsonl"
+FUNCTIONS_FILE = SCRIPT_DIR / "functions.jsonl"
 
 # ──────Class──────────────────────────────────────────────────────────
 class RetrievalAugmentedGeneration:
@@ -37,30 +37,26 @@ class RetrievalAugmentedGeneration:
         print("Query history:", self.query_history)
 
     def load_embeddings(self) -> Optional[List[np.ndarray]]:
-        embeddings = []
         try:
             with open(EMBEDDING_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip():
-                        continue 
-                    embedding = json.loads(line.strip())
-                    embeddings.append(np.array(embedding))
+                return [np.array(json.loads(line)) for line in f if line.strip()]
         except FileNotFoundError:
             console.log("[red]Embeddings file not found.")
-        return embeddings
-
+            return []
+        except json.JSONDecodeError:
+            console.log("[red]Embeddings file is not valid JSONL.")
+            return []
+    
     def load_functions(self) -> Optional[List[Dict[str, str]]]:
-        functions = []
         try:
             with open(FUNCTIONS_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip():
-                        continue 
-                    function = json.loads(line.strip())
-                    functions.append(function)
+                return [json.loads(line) for line in f if line.strip()]
         except FileNotFoundError:
             console.log("[red]Functions file not found.")
-        return functions
+            return []
+        except json.JSONDecodeError:
+            console.log("[red]Functions file is not valid JSONL.")
+            return []
 
     def extract_html(self, url: str) -> Optional[Dict[str, str]]:
         response = requests.get(url)
@@ -145,5 +141,5 @@ if __name__ == "__main__":
         else:
             func = rag.find_by_url(url)
     console.print(rag.embeddings)
-    result = rag.query("Function to perform PCA on h5AD file")
+    result = rag.query("Function to perform PCA")
     console.print("Response to the query is", result) 
