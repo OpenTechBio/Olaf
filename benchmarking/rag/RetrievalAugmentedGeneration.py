@@ -24,8 +24,17 @@ EMBEDDING_FILE = SCRIPT_DIR / "embeddings.json"
 FUNCTIONS_FILE = SCRIPT_DIR / "functions.json"
 
 # ──────Class──────────────────────────────────────────────────────────
-class URLExtractor:
-    
+class RetrievalAugmentedGeneration:
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+
+    def __init__(self):
+        self.embeddings = self.load_embeddings()
+        self.functions = self.load_functions()
+        self.query_history = []
+
+    def view_history(self):
+        print("Query history:", self.query_history)
+
     def extract_scib(self, url):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -38,26 +47,14 @@ class URLExtractor:
         func_def = func_sig.get_text(strip=True)
         descr_tag = func_sig.find_next_sibling("dd")
         func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
-        func = {"source": url, "definition": func_def, "description": func_descr} 
-        return func 
-        
-class RetrievalAugmentedGeneration:
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+        return {"source": url, "definition": func_def, "description": func_descr} 
 
-    def __init__(self):
-        self.embeddings = self.load_embeddings()
-        self.functions = self.load_functions()
-        self.query_history = []
-
-    def view_history(self):
-        print("Query history:", self.query_history)
-
-    def create_function(self, func):
+    def add_function(self, func):
         try:
             with open(FUNCTIONS_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(func) + "\n")
         except Exception as e:
-            console.log(f"[red]Failed to write to FUNCTIONS_FILE")
+            console.print(f"[red]Failed to write to FUNCTIONS_FILE")
         self.functions.append(func)
         return func
 
@@ -83,27 +80,27 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Functions file not found.")
         return functions
 
-    def create_embedding(self, text:str):
-        embedding = self.model.encode([text])[0]
+    def create_embeddings(self, text:str):
+        embeddings = self.model.encode([text])[0]
         try:
             with open(EMBEDDING_FILE, "a", encoding="utf-8") as f:
-                f.write(json.dumps(embedding.tolist()) + "\n")
-            self.embeddings.append(embedding)
+                f.write(json.dumps(embeddings.tolist()) + "\n")
+            self.embeddings.append(embeddings)
             console.print(f"[green]Embeddings successfully stored in {EMBEDDING_FILE}")
         except Exception as e:
             console.print(f"[red]Failed to create embeddings: {e}")
 
-    def url_exists(self, source):
+    def url_exists(self, url):
         for f in self.functions:
-            if source == f["source"]:
+            if url == f["source"]:
                 return True
         return False 
 
-    def find_by_source(self, url):
+    def find_by_url(self, url):
         for idx, f in enumerate(self.functions):
             if f["source"] == url:
                 return f
-        console.log("URL not found")
+        console.print("URL not found")
         return None
 
     @staticmethod
@@ -126,23 +123,15 @@ class RetrievalAugmentedGeneration:
 # ── Example ─────────────────────────────────────────────
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
-    urls =[
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.graph_connectivity.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.graph_connectivity.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.kbet.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.lisi.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.nmi_ari_cluster_labels_kmeans.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.bras.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.benchmark.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.normalized_score.html"
-    ]
-    for url in urls[:5]:
+    urls =["https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_csv.html" ]
+    for url in urls:
         if not rag.url_exists(url):
             func = rag.extract_scib(url)
+            rag.create_function(func)
             if func and func["description"]:
                 rag.create_embeddings(func["description"])
         else:
-            func = rag.find_by_source(url)
+            func = rag.find_by_url(url)
     console.print(rag.embeddings)
     result = rag.query("What is ari?")
     console.print("Response to the query is", result)
