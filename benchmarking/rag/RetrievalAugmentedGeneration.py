@@ -35,29 +35,6 @@ class RetrievalAugmentedGeneration:
     def view_history(self):
         print("Query history:", self.query_history)
 
-    def extract_scib(self, url):
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        func_sig = soup.select_one("dt.sig.sig-object.py")
-        if not func_sig:
-            console.log("[red] No function signature found")
-            return ""
-
-        func_def = func_sig.get_text(strip=True)
-        descr_tag = func_sig.find_next_sibling("dd")
-        func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
-        return {"source": url, "definition": func_def, "description": func_descr} 
-
-    def add_function(self, func):
-        try:
-            with open(FUNCTIONS_FILE, "a", encoding="utf-8") as f:
-                f.write(json.dumps(func) + "\n")
-        except Exception as e:
-            console.print(f"[red]Failed to write to FUNCTIONS_FILE")
-        self.functions.append(func)
-        return func
-
     def load_embeddings(self):
         embeddings = []
         try:
@@ -79,6 +56,29 @@ class RetrievalAugmentedGeneration:
         except FileNotFoundError:
             console.log("[red]Functions file not found.")
         return functions
+
+    def extract_html(self, url):
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        func_sig = soup.select_one("dt.sig.sig-object.py")
+        if not func_sig:
+            console.log("[red] No function signature found")
+            return ""
+
+        func_def = func_sig.get_text(strip=True)
+        descr_tag = func_sig.find_next_sibling("dd")
+        func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
+        return {"source": url, "definition": func_def, "description": func_descr} 
+
+    def add_function(self, func):
+        try:
+            with open(FUNCTIONS_FILE, "a", encoding="utf-8") as f:
+                f.write(json.dumps(func) + "\n")
+        except Exception as e:
+            console.print(f"[red]Failed to write to FUNCTIONS_FILE")
+        self.functions.append(func)
+        return func
 
     def create_embeddings(self, text:str):
         embeddings = self.model.encode([text])[0]
@@ -126,9 +126,9 @@ if __name__ == "__main__":
     urls =["https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_csv.html" ]
     for url in urls:
         if not rag.url_exists(url):
-            func = rag.extract_scib(url)
-            rag.create_function(func)
+            func = rag.extract_html(url)
             if func and func["description"]:
+                rag.add_function(func)
                 rag.create_embeddings(func["description"])
         else:
             func = rag.find_by_url(url)
