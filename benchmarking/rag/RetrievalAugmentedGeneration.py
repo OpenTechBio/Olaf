@@ -24,6 +24,23 @@ EMBEDDING_FILE = SCRIPT_DIR / "embeddings.json"
 FUNCTIONS_FILE = SCRIPT_DIR / "functions.json"
 
 # ──────Class──────────────────────────────────────────────────────────
+class URLExtractor:
+    
+    def extract_scib(self, url):
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        func_sig = soup.select_one("dt.sig.sig-object.py")
+        if not func_sig:
+            console.log("[red] No function signature found")
+            return ""
+
+        func_def = func_sig.get_text(strip=True)
+        descr_tag = func_sig.find_next_sibling("dd")
+        func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
+        func = {"source": url, "definition": func_def, "description": func_descr} 
+        return func 
+        
 class RetrievalAugmentedGeneration:
     model = SentenceTransformer('all-MiniLM-L6-v2')
 
@@ -34,26 +51,13 @@ class RetrievalAugmentedGeneration:
 
     def view_history(self):
         print("Query history:", self.query_history)
-        return self.query_history
 
-    def extract_scib(self, url):
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        func_sig = soup.select_one("dt.sig.sig-object.py")
-        if not func_sig:
-            console.log("No function signature found")
-            return ""
-
-        func_def = func_sig.get_text(strip=True)
-        descr_tag = func_sig.find_next_sibling("dd")
-        func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
-        func = {"source": url, "definition": func_def, "description": func_descr} 
+    def create_function(self, func):
         try:
             with open(FUNCTIONS_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(func) + "\n")
         except Exception as e:
-            console.log(f"[red]Failed to write to FUNCTIONS_FILE: {e}")
+            console.log(f"[red]Failed to write to FUNCTIONS_FILE")
         self.functions.append(func)
         return func
 
@@ -79,12 +83,12 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Functions file not found.")
         return functions
 
-    def create_embeddings(self, text:str):
-        embeddings = self.model.encode([text])[0]
+    def create_embedding(self, text:str):
+        embedding = self.model.encode([text])[0]
         try:
             with open(EMBEDDING_FILE, "a", encoding="utf-8") as f:
-                f.write(json.dumps(embeddings.tolist()) + "\n")
-            self.embeddings.append(embeddings)
+                f.write(json.dumps(embedding.tolist()) + "\n")
+            self.embeddings.append(embedding)
             console.print(f"[green]Embeddings successfully stored in {EMBEDDING_FILE}")
         except Exception as e:
             console.print(f"[red]Failed to create embeddings: {e}")
@@ -122,11 +126,8 @@ class RetrievalAugmentedGeneration:
 # ── Example ─────────────────────────────────────────────
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
-    urls = [
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.ari.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.nmi.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.asw_label.html",
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.asw_label.html",
+    urls =[
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.graph_connectivity.html",
     "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.graph_connectivity.html",
     "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.kbet.html",
     "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.lisi.html",
