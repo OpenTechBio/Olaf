@@ -43,11 +43,8 @@ class RetrievalAugmentedGeneration:
                 for line in f:
                     if not line.strip():
                         continue 
-                    try:
-                        embedding = json.loads(line.strip())
-                        embeddings.append(np.array(embedding))
-                    except json.JSONDecodeError:
-                        console.print(f"[red] Invalid embedding line skipped: {line}")
+                    embedding = json.loads(line.strip())
+                    embeddings.append(np.array(embedding))
         except FileNotFoundError:
             console.log("[red]Embeddings file not found.")
         return embeddings
@@ -59,11 +56,8 @@ class RetrievalAugmentedGeneration:
                 for line in f:
                     if not line.strip():
                         continue 
-                    try:
-                        function = json.loads(line.strip())
-                        functions.append(function)
-                    except json.JSONDecodeError:
-                        console.print(f"[red] Invalid embedding line skipped: {line}")
+                    function = json.loads(line.strip())
+                    functions.append(function)
         except FileNotFoundError:
             console.log("[red]Functions file not found.")
         return functions
@@ -103,9 +97,9 @@ class RetrievalAugmentedGeneration:
             console.print(f"[red]Failed to create embeddings: {e}")
 
     def url_exists(self, url: str) -> bool:
-        console.print("[yellow] Function and embedding already exists.")
         for f in self.functions:
             if url == f["source"]:
+                console.print("[yellow] Function and embedding already exists.")
                 return True
         return False 
 
@@ -141,7 +135,7 @@ class RetrievalAugmentedGeneration:
 #─────────────────────────────────────────────
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
-    urls =["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"]
+    urls =["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html", "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_mtx.html", "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_h5ad.html", "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_10x_mtx.html"]
     for url in urls:
         if not rag.url_exists(url):
             func = rag.extract_html(url)
@@ -151,5 +145,5 @@ if __name__ == "__main__":
         else:
             func = rag.find_by_url(url)
     console.print(rag.embeddings)
-    result = rag.query("Function to perform PCA")
+    result = rag.query("Function to perform PCA on h5AD file")
     console.print("Response to the query is", result) 
