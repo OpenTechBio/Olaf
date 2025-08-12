@@ -9,11 +9,13 @@ from typing import List, Dict, Union, Optional
 # ── Dependencies ─────────────────────────────────────────────
 try: 
     import requests
+    import re 
     import numpy as np
     from bs4 import BeautifulSoup
     from sentence_transformers import SentenceTransformer
     from validators import url as is_url
     from rich.console import Console
+    import wikipedia 
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
     sys.exit(1) 
@@ -132,14 +134,32 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     urls =["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html", "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_mtx.html", "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_h5ad.html", "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_10x_mtx.html"]
-    for url in urls:
+
+    keywords = [
+        "Principal component analysis",    # for scib_metrics.utils.pca
+        "Matrix market exchange format",   # for scanpy.read_mtx
+        "HDF5",                            # for scanpy.read_h5ad (since h5ad files are based on HDF5)
+        "10x Genomics"                     # for scanpy.read_10x_mtx
+    ]
+
+    for i in range(len(urls)):
+        url = urls[i]
+        keyword = keywords[i]
         if not rag.url_exists(url):
             func = rag.extract_html(url)
             if func and func["description"]:
                 rag.add_function(func)
-                rag.create_embeddings(func["description"])
+                search_results = wikipedia.search(keyword)
+                if not search_results:
+                    continue
+                search = search_results[0]
+                try:
+                    wiki_summary = wikipedia.summary(search, sentences=20)
+                except:
+                    wiki_summary = ""
+                embedding_text = wiki_summary + func["description"]
+                rag.create_embeddings(embedding_text)
         else:
             func = rag.find_by_url(url)
-    console.print(rag.embeddings)
-    result = rag.query("Function to perform PCA")
-    console.print("Response to the query is", result) 
+
+    print(rag.query("what is a HDF5 file"))
