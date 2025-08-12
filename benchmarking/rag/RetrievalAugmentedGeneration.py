@@ -17,7 +17,9 @@ try:
     from validators import url as is_url
     from rich.console import Console
     import wikipedia 
+    import random 
     import matplotlib.pyplot as plt
+    import numpy as np
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
     sys.exit(1) 
@@ -153,7 +155,7 @@ class RetrievalAugmentedGeneration:
     
         plt.legend()
         plt.title("UMAP Projection of Embeddings + Query")
-        plt.savefig("umap_plot_annotated.png")
+        plt.savefig(f"umap_plot_annotated{random.randint(0, 100)}.png")
         print("UMAP plot saved as umap_plot_annotated.png")
         plt.close()
     
@@ -169,21 +171,12 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     urls = [
-    # Cupcake
-    "A cupcake is a small, single-serving cake that is typically baked in a thin paper or foil cup. It is often topped with frosting, sprinkles, or other decorations to enhance both its flavor and appearance. Cupcakes can come in a wide variety of flavors, such as vanilla, chocolate, red velvet, or lemon. They are popular for parties and celebrations because they are easy to serve and require no slicing. Many bakeries also create gourmet cupcakes with creative fillings and toppings.",
-    
-    # Cake
-    "Cake is a sweet baked dessert made from a mixture of flour, sugar, eggs, butter or oil, and a leavening agent such as baking powder. It can be flavored with a variety of ingredients, including cocoa, vanilla, fruit, or spices. Cakes are often layered and frosted, making them a centerpiece for birthdays, weddings, and other celebrations. They can range in texture from light and fluffy to rich and dense. Over time, countless cultural variations of cake have emerged worldwide.",
-    
-    # Dosa
-    "A dosa is a thin, crispy South Indian crepe made from a fermented batter of rice and lentils. It is typically served hot with chutney and sambar, a spicy lentil-based vegetable stew. Dosas can be plain or filled with a variety of ingredients, the most popular being spiced mashed potatoes in a masala dosa. The fermentation process gives the dosa a slightly tangy flavor and a light texture. It is a staple breakfast dish in many parts of India and is also enjoyed internationally.",
-    
-    # Biryani
-    "Biryani is a flavorful and aromatic rice dish that is popular across South Asia and the Middle East. It is typically made with long-grain basmati rice, meat such as chicken, mutton, or fish, and a blend of fragrant spices. The dish is often layered and slow-cooked to allow the flavors to meld together. Biryani can also be prepared in vegetarian versions using vegetables and paneer. It is often served with raita, salad, or boiled eggs as accompaniments.",
-    
-    # Pakistan
-    "Pakistan is a country in South Asia, bordered by India, Afghanistan, Iran, and China. It has a rich cultural heritage influenced by Persian, Central Asian, and South Asian traditions. The country is known for its diverse landscapes, ranging from mountains like K2 in the north to coastal areas along the Arabian Sea. Pakistan’s cuisine, music, literature, and architecture reflect centuries of history and cultural exchange. It is also home to several UNESCO World Heritage sites, including Mohenjo-daro and the Lahore Fort."
+    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html",
+    "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_mtx.html",
+    "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_h5ad.html",
+    "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_10x_mtx.html"
 ]
+
 
     keywords = [
         "Principal component analysis",    # for scib_metrics.utils.pca
@@ -192,23 +185,26 @@ if __name__ == "__main__":
         "10x Genomics"                     # for scanpy.read_10x_mtx
     ]
 
+    prompts = ["Perform prinicipal component analysis on h5ad", "Perform PCA on h5ad file", "Perform PCA on h5ad", "Do prinicipal component analysis", "Do PCA on h5ad file", "Compute PCA", "Read 10x mtx file"]
+
     for i in range(len(urls)):
-        # url = urls[i]
-        # keyword = keywords[i]
-        # if not rag.url_exists(url):
-        #     func = rag.extract_html(url)
-        #     if func and func["description"]:
-        #         rag.add_function(func)
-                # search_results = wikipedia.search(keyword)
-                # if not search_results:
-                #     continue
-                # search = search_results[0]
-                # try:
-                #     wiki_summary = wikipedia.summary(search, sentences=20)
-                # except:
-                #     wiki_summary = ""
-        embedding_text = urls[i] #+ func["description"]
+        url = urls[i]
+        keyword = keywords[i]
+        if not rag.url_exists(url):
+            func = rag.extract_html(url)
+            if func and func["description"]:
+                rag.add_function(func)
+                search_results = wikipedia.search(keyword)
+                if not search_results:
+                    continue
+                search = search_results[0]
+                try:
+                    wiki_summary = wikipedia.summary(search, sentences=20)
+                except:
+                    wiki_summary = ""
+        embedding_text = urls[i] + func["description"]
         rag.functions.append(urls[i])
         rag.create_embeddings(embedding_text)
 
-    print(rag.query("What type of rice is most commonly used in biryani?"))
+    for prompt in prompts:
+        print(rag.query(prompt))
