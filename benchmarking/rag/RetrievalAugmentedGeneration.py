@@ -203,7 +203,6 @@ if __name__ == "__main__":
                 except:
                     wiki_summary = ""
         embedding_text = urls[i] + func["description"]
-        rag.functions.append(urls[i])
         rag.create_embeddings(embedding_text)
 
     for prompt in prompts:
