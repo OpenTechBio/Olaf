@@ -9,7 +9,7 @@ from typing import List, Dict, Union, Optional
 # ── Dependencies ─────────────────────────────────────────────
 try: 
     import requests
-    import umap.UMAP
+    from umap import UMAP
     import re 
     import numpy as np
     from bs4 import BeautifulSoup
@@ -17,6 +17,7 @@ try:
     from validators import url as is_url
     from rich.console import Console
     import wikipedia 
+    import matplotlib.pyplot as plt
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
     sys.exit(1) 
@@ -133,15 +134,28 @@ class RetrievalAugmentedGeneration:
         all_embeddings = np.vstack([self.embeddings, query_embedding.reshape(1, -1)])
     
         # Reduce to 2D with UMAP
-        umap_embeddings = UMAP(n_neighbors=15, min_dist=0.1, metric='cosine').fit_transform(all_embeddings)
+        n_neighbors = min(15, len(all_embeddings) - 1)
+        umap_embeddings = UMAP(n_neighbors=n_neighbors, min_dist=0.1, metric='cosine').fit_transform(all_embeddings)
     
         # Plot
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(10, 8))
         plt.scatter(umap_embeddings[:-1, 0], umap_embeddings[:-1, 1], label="Chunks")
         plt.scatter(umap_embeddings[-1, 0], umap_embeddings[-1, 1], color="red", label="Query", marker="x", s=100)
+    
+        # Annotate chunk points with their names/titles
+        for i, (x, y) in enumerate(umap_embeddings[:-1]):
+            label = self.functions[i].get("name", f"Chunk {i}") if isinstance(self.functions[i], dict) else f"Chunk {i}"
+            plt.annotate(label, (x, y), textcoords="offset points", xytext=(0,5), ha='center', fontsize=8, color='blue')
+    
+        # Annotate query point
+        plt.annotate("Query", (umap_embeddings[-1, 0], umap_embeddings[-1, 1]),
+                     textcoords="offset points", xytext=(0,5), ha='center', fontsize=10, color='red')
+    
         plt.legend()
         plt.title("UMAP Projection of Embeddings + Query")
-        plt.show()
+        plt.savefig("umap_plot_annotated.png")
+        print("UMAP plot saved as umap_plot_annotated.png")
+        plt.close()
     
         return self.functions[idx]
 
