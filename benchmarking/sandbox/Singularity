@@ -1,66 +1,54 @@
 Bootstrap: docker
-From: python:3.11-slim
+From: rapidsai/rapidsai-core:24.06-cuda12.2-runtime-ubuntu22.04-py3.11
 
-# ---------------------------------------------------------------
-# Copy project files (runs on the host before %post is executed)
-# ---------------------------------------------------------------
 %setup
 mkdir -p "${SINGULARITY_ROOTFS}/opt/app"
 cp "requirements.txt"  "${SINGULARITY_ROOTFS}/opt/app/requirements.txt"
 cp "kernel_api.py"     "${SINGULARITY_ROOTFS}/opt/app/kernel_api.py"
 cp "start_kernel.py"   "${SINGULARITY_ROOTFS}/opt/app/start_kernel.py"
 cp "start.sh"          "${SINGULARITY_ROOTFS}/opt/app/start.sh"
-cp "offline_kernel.py"   "${SINGULARITY_ROOTFS}/opt/offline_kernel.py"
+cp "offline_kernel.py" "${SINGULARITY_ROOTFS}/opt/offline_kernel.py"
 
-# ---------------------------------------------------------------
-# Build steps executed INSIDE the container
-# ---------------------------------------------------------------
 %post
 export DEBIAN_FRONTEND=noninteractive
-
-# --- 1 ▸ System packages ---------------------------------------
 apt-get update && apt-get install -y --no-install-recommends \
-    tini tzdata build-essential pkg-config libhdf5-dev libsodium-dev \
-    libzmq3-dev gcc g++ sudo curl wget git vim nano unzip zip && \
+    tini tzdata build-essential pkg-config libhdf5-dev libsodium-dev libzmq3-dev \
+    sudo curl wget git vim nano unzip zip && \
     ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- 2 ▸ Non‑root user ----------------------------------------
-NB_USER="sandboxuser"
-NB_UID=1001
-NB_GID=1001
-groupadd  -g "$NB_GID" "$NB_USER"
-useradd   -m -s /bin/bash -u "$NB_UID" -g "$NB_GID" "$NB_USER"
-echo "$NB_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# NVIDIA PyPI for RAPIDS
+export PIP_EXTRA_INDEX_URL="https://pypi.nvidia.com"
 
-# --- 3 ▸ Python dependencies -----------------------------------
-pip install --no-cache-dir --upgrade pip
-pip install --no-cache-dir -r /opt/app/requirements.txt
+python -m pip install --no-cache-dir --upgrade pip
+python -m pip install --no-cache-dir \
+  --extra-index-url=https://pypi.nvidia.com \
+  -r /opt/app/requirements.txt
 
-# --- 4 ▸ Permissions & executables -----------------------------
-chown -R "$NB_USER:$NB_GID" /opt/app
+chown -R 1001:1001 /opt/app
 chmod +x /opt/app/start_kernel.py /opt/app/start.sh
-
-chown "$NB_USER:$NB_GID" /opt/offline_kernel.py
+chown 1001:1001 /opt/offline_kernel.py
 chmod +x /opt/offline_kernel.py
 
-# ---------------------------------------------------------------
-# Runtime environment
-# ---------------------------------------------------------------
 %environment
 export DEBIAN_FRONTEND=noninteractive
 export USER=sandboxuser
 export HOME=/home/sandboxuser
 export PATH=$HOME/.local/bin:$PATH
 export IPY_BASE_PORT=4000
+# Keep index for any future pip installs
+export PIP_EXTRA_INDEX_URL=https://pypi.nvidia.com
 
-# ---------------------------------------------------------------
-# What happens on ‘apptainer run …’
-# ---------------------------------------------------------------
 %runscript
+# Warn if GPU not exposed; still run cleanly
+if ! command -v nvidia-smi >/dev/null 2>&1; then
+  echo "[INFO] No NVIDIA GPUs visible. RAPIDS features will be disabled."
+fi
 exec /usr/bin/tini -- /opt/app/start.sh "$@"
 
-# Optional: behaviour for ‘apptainer instance start …’
 %startscript
+if ! command -v nvidia-smi >/dev/null 2>&1; then
+  echo "[INFO] No NVIDIA GPUs visible. RAPIDS features will be disabled."
+fi
 exec /usr/bin/tini -- /opt/app/start.sh "$@"
