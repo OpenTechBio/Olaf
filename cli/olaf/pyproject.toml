@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "olaf"
+version = "0.1.0"
+description = "CLI + library for <what it does>"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+
+# Core runtime deps (PyPI names!)
+dependencies = [
+  "cellxgene-census",
+  "tiledbsoma",
+  "rich",
+  "numpy",
+  "docker",           # a.k.a. docker-py
+  "python-dotenv",    # NOTE: PyPI name is 'python-dotenv' (import is 'dotenv')
+  "openai",
+  "jupyter-client",   # NOTE: PyPI name has a hyphen
+  "nbformat"
+]
+
+# If you want a command like `olaf …`
+[project.scripts]
+olaf = "olaf.cli.main:main"
+
+# Optional extras (install with: pip install .[dev])
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "ruff",
+  "mypy",
+  "ipykernel"
+]
+
+# If you’re using a src/ layout, tell Hatch where packages live.
+[tool.hatch.build.targets.wheel]
+packages = ["src/olaf"]
