@@ -119,47 +119,87 @@ class RetrievalAugmentedGeneration:
         sims = [np.dot(A, emb) / (np.linalg.norm(A) * np.linalg.norm(emb)) for emb in B]
         return sims
 
+    
     def query(self, text_query: str) -> Optional[Dict[str, str]]:
         self.query_history.append(text_query)
         if not self.embeddings:
             console.log("[yellow]No embeddings to compare.")
             return {}
-    
-        # Encode the query
         query_embedding = self.model.encode([text_query])[0]
-    
-        # Find most similar embedding
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
+        return self.functions[idx]
+
+    def umap_plot(self) -> None:
+        if not self.embeddings or not self.queries:
+            console.log("[yellow]No embeddings and/or queries to plot.")
+            return
     
-        # Stack embeddings + query embedding
+        query_embedding = self.model.encode(self.queries)[0]
         all_embeddings = np.vstack([self.embeddings, query_embedding.reshape(1, -1)])
     
         # Reduce to 2D with UMAP
         n_neighbors = min(15, len(all_embeddings) - 1)
-        umap_embeddings = UMAP(n_neighbors=n_neighbors, min_dist=0.1, metric='cosine').fit_transform(all_embeddings)
+        umap_embeddings = UMAP(
+            n_neighbors=n_neighbors,
+            min_dist=0.1,
+            metric='cosine'
+        ).fit_transform(all_embeddings)
     
         # Plot
         plt.figure(figsize=(10, 8))
         plt.scatter(umap_embeddings[:-1, 0], umap_embeddings[:-1, 1], label="Chunks")
-        plt.scatter(umap_embeddings[-1, 0], umap_embeddings[-1, 1], color="red", label="Query", marker="x", s=100)
+        plt.scatter(umap_embeddings[-1, 0], umap_embeddings[-1, 1],
+                    color="red", label="Query", marker="x", s=100)
     
-        # Annotate chunk points with their names/titles
+        # Annotate chunks
         for i, (x, y) in enumerate(umap_embeddings[:-1]):
             label = self.functions[i].get("name", f"Chunk {i}") if isinstance(self.functions[i], dict) else f"Chunk {i}"
-            plt.annotate(label, (x, y), textcoords="offset points", xytext=(0,5), ha='center', fontsize=8, color='blue')
+            plt.annotate(label, (x, y), textcoords="offset points", xytext=(0, 5),
+                         ha='center', fontsize=8, color='blue')
     
-        # Annotate query point
+        # Annotate query
         plt.annotate("Query", (umap_embeddings[-1, 0], umap_embeddings[-1, 1]),
-                     textcoords="offset points", xytext=(0,5), ha='center', fontsize=10, color='red')
+                     textcoords="offset points", xytext=(0, 5),
+                     ha='center', fontsize=10, color='red')
     
         plt.legend()
         plt.title("UMAP Projection of Embeddings + Query")
-        plt.savefig(f"umap_plot_annotated{random.randint(0, 100)}.png")
-        print("UMAP plot saved as umap_plot_annotated.png")
+        filename = f"umap_plot_annotated{random.randint(0, 100)}.png"
+        plt.savefig(filename)
+        console.log(f"[green]UMAP plot saved as {filename}[/green]")
         plt.close()
+
+
+    def cosine_distance_heatmap(self) -> None:
+        if not self.embeddings or not self.queries:
+            console.log("[yellow]No embeddings or queries to compare.")
+            return
     
-        return self.functions[idx]
+        query_embedding = self.model.encode(self.queries)[0]
+        distances = sklearn.metrics.pairwise_distances(
+            X=query_embedding.reshape(1, -1),
+            Y=np.array(self.embeddings),
+            metric='cosine'
+        )
+    
+        # Create labels
+        labels = [
+            self.functions[i].get("name", f"Chunk {i}") if isinstance(self.functions[i], dict) else f"Chunk {i}"
+            for i in range(len(self.embeddings))
+        ]
+    
+        # Plot heatmap
+        plt.figure(figsize=(10, 2))
+        sns.heatmap(distances, square=False, annot=True, cbar=False, cmap='Blues',
+                    xticklabels=labels, yticklabels=["Query"])
+        plt.title("Cosine Distance Heatmap")
+        plt.xticks(rotation=45, ha="right", fontsize=8)
+        plt.tight_layout()
+        filename = f"cosine_distance_heatmap_{random.randint(0, 100)}.png"
+        plt.savefig(filename)
+        console.log(f"[green]Cosine distance heatmap saved as {filename}[/green]")
+        plt.close()
 
 
     def clear(self) -> None:
@@ -171,12 +211,11 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     urls = [
-    "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html",
-    "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_mtx.html",
-    "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_h5ad.html",
-    "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_10x_mtx.html"
-]
-
+        "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html",
+        "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_mtx.html",
+        "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_h5ad.html",
+        "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_10x_mtx.html"
+    ]
 
     keywords = [
         "Principal component analysis",    # for scib_metrics.utils.pca
@@ -185,7 +224,28 @@ if __name__ == "__main__":
         "10x Genomics"                     # for scanpy.read_10x_mtx
     ]
 
-    prompts = ["Perform prinicipal component analysis on h5ad", "Perform PCA on h5ad file", "Perform PCA on h5ad", "Do prinicipal component analysis", "Do PCA on h5ad file", "Compute PCA", "Read 10x mtx file"]
+    prompts = [
+        # PCA
+        "How to perform principal component analysis?",
+        "Explain PCA usage in scib_metrics",
+    
+        # read_mtx
+        "How to read matrix market files with Scanpy?",
+        "Load sparse count data in Scanpy",
+    
+        # read_h5ad
+        "How to load h5ad files with Scanpy?",
+        "Usage of scanpy.read_h5ad",
+    
+        # read_10x_mtx
+        "How to read 10x Genomics data in Scanpy?",
+        "Explain scanpy.read_10x_mtx function"
+        ]
+
+    #WATCH VIDEO --> new transformer model may be less dependent on the length of the embedding, attention models work because of a learned relationship between tokens  
+    #experiment sentence length with query 
+    #experiment manually --> tell the agent works best
+    #try cosine similarity instead of umap, can try to do a heatmap
 
     for i in range(len(urls)):
         url = urls[i]
@@ -194,16 +254,13 @@ if __name__ == "__main__":
             func = rag.extract_html(url)
             if func and func["description"]:
                 rag.add_function(func)
-                search_results = wikipedia.search(keyword)
-                if not search_results:
-                    continue
-                search = search_results[0]
                 try:
-                    wiki_summary = wikipedia.summary(search, sentences=20)
+                    search_results = wikipedia.search(keyword)
+                    wiki_summary = wikipedia.summary(search_results[0], sentences=20)
                 except:
                     wiki_summary = ""
-        embedding_text = urls[i] + func["description"]
-        rag.create_embeddings(embedding_text)
-
+                embedding_text = wiki_summary + func["description"]
+                rag.create_embeddings(embedding_text)
     for prompt in prompts:
-        print(rag.query(prompt))
+        rag.query(prompt)
+    rag.umap_plot()
