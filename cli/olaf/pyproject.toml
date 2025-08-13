@@ -20,7 +20,8 @@ dependencies = [
   "python-dotenv",    # NOTE: PyPI name is 'python-dotenv' (import is 'dotenv')
   "openai",
   "jupyter-client",   # NOTE: PyPI name has a hyphen
-  "nbformat"
+  "nbformat",
+  "typer"
 ]
 
 # If you want a command like `olaf …`
