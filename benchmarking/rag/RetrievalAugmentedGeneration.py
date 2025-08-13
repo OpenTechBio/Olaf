@@ -133,14 +133,20 @@ class RetrievalAugmentedGeneration:
         idx = np.argmax(sims)
         return self.functions[idx]
 
-    def umap_plot(self) -> None:
+    def umap_plot(self, keywords: List[str]) -> None:
         if not self.embeddings or not self.queries:
-            console.log("[yellow]No embeddings and/or queries to plot.")
+            console.log("[yellow]No embeddings or queries to plot.")
             return
-    
-        query_embedding = self.model.encode(self.queries)[0]
-        all_embeddings = np.vstack([self.embeddings, query_embedding.reshape(1, -1)])
-    
+        
+        if len(keywords) != len(self.embeddings):
+            console.log("[red]Number of keywords must match number of embeddings![/red]")
+            return
+        
+        # Encode all queries
+        query_embeddings = self.model.encode(self.queries)
+        embeddings_array = np.array(self.embeddings)
+        all_embeddings = np.vstack([embeddings_array, query_embeddings])
+        
         # Reduce to 2D with UMAP
         n_neighbors = min(15, len(all_embeddings) - 1)
         umap_embeddings = UMAP(
@@ -148,60 +154,67 @@ class RetrievalAugmentedGeneration:
             min_dist=0.1,
             metric='cosine'
         ).fit_transform(all_embeddings)
-    
+        
         # Plot
         plt.figure(figsize=(10, 8))
-        plt.scatter(umap_embeddings[:-1, 0], umap_embeddings[:-1, 1], label="Chunks")
-        plt.scatter(umap_embeddings[-1, 0], umap_embeddings[-1, 1],
-                    color="red", label="Query", marker="x", s=100)
-    
-        # Annotate chunks
-        for i, (x, y) in enumerate(umap_embeddings[:-1]):
-            label = self.functions[i].get("name", f"Chunk {i}") if isinstance(self.functions[i], dict) else f"Chunk {i}"
-            plt.annotate(label, (x, y), textcoords="offset points", xytext=(0, 5),
+        plt.scatter(umap_embeddings[:len(self.embeddings), 0],
+                    umap_embeddings[:len(self.embeddings), 1],
+                    label="Chunks", color="blue")
+        plt.scatter(umap_embeddings[len(self.embeddings):, 0],
+                    umap_embeddings[len(self.embeddings):, 1],
+                    label="Queries", color="red", marker="x", s=100)
+        
+        # Annotate embeddings with keywords
+        for i, (x, y) in enumerate(umap_embeddings[:len(self.embeddings)]):
+            plt.annotate(keywords[i], (x, y), textcoords="offset points", xytext=(0, 5),
                          ha='center', fontsize=8, color='blue')
-    
-        # Annotate query
-        plt.annotate("Query", (umap_embeddings[-1, 0], umap_embeddings[-1, 1]),
-                     textcoords="offset points", xytext=(0, 5),
-                     ha='center', fontsize=10, color='red')
-    
+        
+        # Annotate queries with actual query strings
+        for i, (x, y) in enumerate(umap_embeddings[len(self.embeddings):]):
+            plt.annotate(self.queries[i], (x, y), textcoords="offset points", xytext=(0, 5),
+                         ha='center', fontsize=10, color='red')
+        
         plt.legend()
-        plt.title("UMAP Projection of Embeddings + Query")
-        filename = f"umap_plot_annotated{random.randint(0, 100)}.png"
+        plt.title("UMAP Projection of All Embeddings + Queries")
+        plt.tight_layout()
+        
+        filename = f"umap_all_queries_{random.randint(0, 100)}.png"
         plt.savefig(filename)
-        console.log(f"[green]UMAP plot saved as {filename}[/green]")
+        console.log(f"[green]UMAP plot for all queries saved as {filename}[/green]")
         plt.close()
-
 
     def cosine_distance_heatmap(self) -> None:
         if not self.embeddings or not self.queries:
             console.log("[yellow]No embeddings or queries to compare.")
             return
     
-        query_embedding = self.model.encode(self.queries)[0]
+        query_embeddings = self.model.encode(self.queries)  
+        embeddings_array = np.array(self.embeddings)        
+    
+        # Compute cosine distances between queries and embeddings
         distances = sklearn.metrics.pairwise_distances(
-            X=query_embedding.reshape(1, -1),
-            Y=np.array(self.embeddings),
+            X=query_embeddings,       # rows: queries
+            Y=embeddings_array,       # cols: embeddings
             metric='cosine'
         )
     
-        # Create labels
-        labels = [
-            self.functions[i].get("name", f"Chunk {i}") if isinstance(self.functions[i], dict) else f"Chunk {i}"
-            for i in range(len(self.embeddings))
-        ]
+        # Labels
+        row_labels = [f"Query {i+1}" for i in range(len(self.queries))]
+        col_labels = [f"Chunk {i+1}" for i in range(len(self.functions))]
     
         # Plot heatmap
-        plt.figure(figsize=(10, 2))
-        sns.heatmap(distances, square=False, annot=True, cbar=False, cmap='Blues',
-                    xticklabels=labels, yticklabels=["Query"])
-        plt.title("Cosine Distance Heatmap")
+        plt.figure(figsize=(len(col_labels)*0.5 + 3, len(row_labels)*0.5 + 2))
+        sns.heatmap(distances, square=False, annot=True, cbar=True, cmap='Blues',
+                    xticklabels=col_labels, yticklabels=row_labels)
+        plt.title("Cosine Distance Heatmap (Queries × Embeddings)")
         plt.xticks(rotation=45, ha="right", fontsize=8)
+        plt.yticks(fontsize=8)
         plt.tight_layout()
-        filename = f"cosine_distance_heatmap_{random.randint(0, 100)}.png"
+    
+        # Save
+        filename = f"full_cosine_distance_heatmap_{random.randint(0, 100)}.png"
         plt.savefig(filename)
-        console.log(f"[green]Cosine distance heatmap saved as {filename}[/green]")
+        console.log(f"[green]Full cosine distance heatmap saved as {filename}[/green]")
         plt.close()
 
 
@@ -266,4 +279,5 @@ if __name__ == "__main__":
                 rag.create_embeddings(embedding_text)
     for prompt in prompts:
         rag.query(prompt)
-    rag.umap_plot()
+    rag.umap_plot(keywords)
+    rag.cosine_distance_heatmap()
