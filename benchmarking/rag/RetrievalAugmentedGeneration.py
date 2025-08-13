@@ -20,6 +20,9 @@ try:
     import random 
     import matplotlib.pyplot as plt
     import numpy as np
+    import sklearn
+    import seaborn as sns
+    
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
     sys.exit(1) 
@@ -37,10 +40,10 @@ class RetrievalAugmentedGeneration:
     def __init__(self) -> None:
         self.embeddings = self.load_embeddings()
         self.functions = self.load_functions()
-        self.query_history = []
+        self.queries = []
 
     def view_history(self) -> None:
-        print("Query history:", self.query_history)
+        print("Query history:", self.queries)
 
     def load_embeddings(self) -> Optional[List[np.ndarray]]:
         try:
@@ -121,7 +124,7 @@ class RetrievalAugmentedGeneration:
 
     
     def query(self, text_query: str) -> Optional[Dict[str, str]]:
-        self.query_history.append(text_query)
+        self.queries.append(text_query)
         if not self.embeddings:
             console.log("[yellow]No embeddings to compare.")
             return {}
@@ -204,7 +207,7 @@ class RetrievalAugmentedGeneration:
 
     def clear(self) -> None:
         self.embeddings = []
-        self.query_history = []
+        self.queries = []
         self.functions = []
         
 #─────────────────────────────────────────────
