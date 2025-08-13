@@ -8,6 +8,7 @@ from .create_agent_cli import app as create_system_app
 # Import the app for the new 'datasets' command
 from .datasets_cli import datasets_app
 from .run_cli import run_app
+from .config_cli import config_app 
 # Main OLAF application
 app = typer.Typer(
     name="olaf",
@@ -19,6 +20,7 @@ app = typer.Typer(
 app.add_typer(create_system_app, name="create-system")
 app.add_typer(datasets_app, name="datasets")
 app.add_typer(run_app, name="run")
+app.add_typer(config_app, name="config")  # <-- Register the new config app
 
 
 def main():

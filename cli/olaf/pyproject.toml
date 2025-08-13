@@ -21,7 +21,8 @@ dependencies = [
   "openai",
   "jupyter-client",   # NOTE: PyPI name has a hyphen
   "nbformat",
-  "typer"
+  "typer",
+  "platformdirs"
 ]
 
 # If you want a command like `olaf …`

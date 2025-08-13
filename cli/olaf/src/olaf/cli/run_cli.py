@@ -8,14 +8,16 @@ import subprocess
 import typer
 from rich.console import Console
 from rich.prompt import Prompt
+from dotenv import load_dotenv
 
 # Import your project's modules and shared configuration
+from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE
+
 from olaf.agents.AgentSystem import AgentSystem
 from olaf.core.io_helpers import collect_resources
 from olaf.core.sandbox_management import (init_docker, init_singularity, init_singularity_exec)
 from olaf.execution.runner import run_agent_session, SandboxManager
 from olaf.datasets.czi_datasets import get_datasets_dir
-from olaf.agents.create_agent_system import DEFAULT_AGENT_DIR
 
 # --- Define package-internal paths ---
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
@@ -102,6 +104,7 @@ def main_run_callback(
     sandbox: str = typer.Option(None, "--sandbox", help="Sandbox backend to use: 'docker', 'singularity', or 'singularity-exec'."), # <-- Changed default
     force_refresh: bool = typer.Option(False, "--force-refresh", help="Force refresh/rebuild of the sandbox environment."),
 ):
+    load_dotenv(dotenv_path=ENV_FILE)
     app_context = AppContext()
     console = app_context.console
     ctx.obj = app_context
