@@ -3,7 +3,7 @@ from typing import List, Tuple, Dict, Optional
 from pathlib import Path
 import json
 
-from cli.sandbox.benchmarking_sandbox_management import (
+from olaf.sandbox.benchmarking_sandbox_management import (
     SandboxManager as _BackendManager,
     CONTAINER_NAME as _SANDBOX_HANDLE,
     IMAGE_TAG as _SANDBOX_IMAGE,  
@@ -32,7 +32,7 @@ def init_docker(script_dir:str, subprocess, console, force_refresh:bool=False):
     return _BackendManager, _SANDBOX_HANDLE, COPY_CMD, EXECUTE_ENDPOINT, STATUS_ENDPOINT
 
 def init_singularity(script_dir:str, subprocess, console, force_refresh:bool=False):
-    import cli.sandbox.benchmarking_sandbox_management_singularity as sing
+    import olaf.sandbox.benchmarking_sandbox_management_singularity as sing
     sandbox_dir = script_dir / "sandbox"
 
     # optional force‑refresh
@@ -72,7 +72,7 @@ def init_singularity(script_dir:str, subprocess, console, force_refresh:bool=Fal
 
 
 def init_singularity_exec(script_dir: str, sanbox_data_path, subprocess, console, force_refresh: bool = False):
-    import cli.sandbox.benchmarking_sandbox_management_singularity as sing
+    import olaf.sandbox.benchmarking_sandbox_management_singularity as sing
     sandbox_dir = script_dir / "sandbox"
 
     # optional force‑refresh

@@ -15,7 +15,7 @@ except ImportError:
 # Create a Typer app for the "datasets" subcommand group
 datasets_app = typer.Typer(
     name="datasets",
-    help="Browse and download datasets from the CZI CELLxGENE Census. Defaults to interactive mode.",
+    help="Browse and download datasets from the CZI CELLxGENE Census.",
     no_args_is_help=False  # Allows our callback to run
 )
 
