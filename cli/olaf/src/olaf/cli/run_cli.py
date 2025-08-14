@@ -2,7 +2,7 @@
 import os
 import textwrap
 from pathlib import Path
-from typing import List, cast
+from typing import List, Tuple, cast
 import subprocess
 
 import typer
@@ -10,69 +10,50 @@ from rich.console import Console
 from rich.prompt import Prompt
 from dotenv import load_dotenv
 
-# Import your project's modules and shared configuration
 from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE
-from olaf.agents.AgentSystem import AgentSystem
+from olaf.agents.AgentSystem import Agent, AgentSystem
 from olaf.core.io_helpers import collect_resources
 from olaf.core.sandbox_management import (init_docker, init_singularity, init_singularity_exec)
 from olaf.execution.runner import run_agent_session, SandboxManager
 from olaf.datasets.czi_datasets import get_datasets_dir
 
-# --- Define package-internal paths ---
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_AGENTS_DIR = PACKAGE_ROOT / "agents"
 PACKAGE_DATASETS_DIR = PACKAGE_ROOT / "datasets"
 
 
-# --- Helper functions for interactive prompts (unchanged) ---
-
 def _prompt_for_file(
-    console: Console,
-    user_dir: Path,
-    package_dir: Path,
-    extension: str,
-    prompt_title: str,
+    console: Console, user_dir: Path, package_dir: Path, extension: str, prompt_title: str
 ) -> Path:
     """
     Generic helper to find files in both user and package directories and prompt for a selection.
     User files take priority over package files with the same name.
     """
     console.print(f"[bold]Select {prompt_title}:[/bold]")
-    
     found_files = []
     seen_filenames = set()
-
     if user_dir.exists():
         for file_path in sorted(list(user_dir.glob(f"**/*{extension}"))):
             if file_path.name not in seen_filenames:
                 found_files.append({"path": file_path, "label": "User"})
                 seen_filenames.add(file_path.name)
-
     if package_dir.exists():
         for file_path in sorted(list(package_dir.glob(f"**/*{extension}"))):
             if file_path.name not in seen_filenames:
                 found_files.append({"path": file_path, "label": "Package"})
                 seen_filenames.add(file_path.name)
-
     if not found_files:
-        console.print(f"[bold red]No '{extension}' files found in your user directory ({user_dir}) or the package directory ({package_dir}).[/bold red]")
+        console.print(f"[bold red]No '{extension}' files found.[/bold red]")
         raise typer.Exit(1)
-        
     for i, file_info in enumerate(found_files, 1):
         console.print(f"  [cyan]{i}[/cyan]: {file_info['path'].name} [yellow]({file_info['label']})[/yellow]")
-
     choice_str = Prompt.ask("Enter the number of your choice", choices=[str(i) for i in range(1, len(found_files) + 1)])
     return found_files[int(choice_str) - 1]['path']
 
 def _prompt_for_driver(console: Console, system: AgentSystem) -> str:
-    """Prompts the user to select a driver agent from the loaded system."""
     console.print("[bold]Select a driver agent:[/bold]")
     agents = list(system.agents.keys())
-    driver = Prompt.ask("Enter the name of the driver agent", choices=agents, default=agents[0])
-    return driver
-
-
-# --- Typer App and Context (unchanged) ---
+    return Prompt.ask("Enter the name of the driver agent", choices=agents, default=agents[0])
 
 run_app = typer.Typer(
     name="run",
@@ -90,6 +71,10 @@ class AppContext:
         self.sandbox_manager: SandboxManager | None = None
         self.llm_client: object | None = None
         self.initial_history: List[dict] | None = None
+        self.dataset_path: Path | None = None
+        self.resources: List[Tuple[Path, str]] = []
+        # Store sandbox details
+        self.sandbox_details: dict = {}
 
 @run_app.callback(invoke_without_command=True)
 def main_run_callback(
@@ -104,7 +89,6 @@ def main_run_callback(
     force_refresh: bool = typer.Option(False, "--force-refresh", help="Force refresh/rebuild of the sandbox environment."),
 ):
     load_dotenv(dotenv_path=ENV_FILE)
-
     app_context = AppContext()
     console = app_context.console
     ctx.obj = app_context
@@ -122,31 +106,29 @@ def main_run_callback(
     
     if dataset is None:
         dataset = _prompt_for_file(console, get_datasets_dir(), PACKAGE_DATASETS_DIR, ".h5ad", "Dataset")
+    app_context.dataset_path = dataset
 
     if sandbox is None:
         sandbox = Prompt.ask("Choose a sandbox backend", choices=["docker", "singularity", "singularity-exec"], default="docker")
-        
+    
     console.print(f"[cyan]Initializing sandbox backend: {sandbox}[/cyan]")
     script_dir = Path(__file__).resolve().parent
     
-    manager_class = None
+    manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = (None, None, None, None, None)
     if sandbox == "docker":
-        manager_class, _, _, _, _ = init_docker(script_dir, subprocess, console, force_refresh=force_refresh)
+        manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_docker(script_dir, subprocess, console, force_refresh=force_refresh)
     elif sandbox == "singularity":
-        manager_class, _, _, _, _ = init_singularity(script_dir, subprocess, console, force_refresh=force_refresh)
+        manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_singularity(script_dir, subprocess, console, force_refresh=force_refresh)
     elif sandbox == "singularity-exec":
         SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
-        manager_class, _, _, _, _ = init_singularity_exec(script_dir, SANDBOX_DATA_PATH, subprocess, console, force_refresh=force_refresh)
+        manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_singularity_exec(script_dir, SANDBOX_DATA_PATH, subprocess, console, force_refresh=force_refresh)
     else:
         raise typer.BadParameter(f"Unknown sandbox type '{sandbox}'.")
-
     app_context.sandbox_manager = manager_class()
+    app_context.sandbox_details = {"handle": handle, "copy_cmd": copy_cmd, "is_exec_mode": sandbox == "singularity-exec"}
 
-    # --- Step 5. Configure LLM Client (Corrected Logic) ---
     if llm_backend is None:
         llm_backend = Prompt.ask("Choose an LLM backend", choices=["chatgpt", "ollama"], default="chatgpt")
-
-    # Only ask for Ollama host if it's the selected backend and the user hasn't already provided a custom host via flags.
     if llm_backend == "ollama" and ollama_host == "http://localhost:11434":
          ollama_host = Prompt.ask("Enter the Ollama base URL", default="http://localhost:11434")
 
@@ -160,35 +142,62 @@ def main_run_callback(
     else:
         raise typer.BadParameter(f"Unknown LLM backend '{llm_backend}'.")
 
-    resources = collect_resources(console, resources_dir) if resources_dir else []
+    app_context.resources = collect_resources(console, resources_dir) if resources_dir else []
     app_context.analysis_context = textwrap.dedent(f"Dataset path: **{dataset.name}**\n...")
     driver = app_context.agent_system.get_agent(driver_agent)
-    system_prompt = (app_context.roster_instructions + "\n\n" + driver.get_full_prompt() + "\n\n" + app_context.analysis_context)
+    system_prompt = (app_context.roster_instructions + "\n\n" + driver.get_full_prompt(app_context.agent_system.global_policy) + "\n\n" + app_context.analysis_context)
     app_context.initial_history = [{"role": "system", "content": system_prompt}]
 
+def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, max_turns: int):
+    """Helper to start, run, and stop the sandbox session."""
+    sandbox_manager = cast(SandboxManager, context.sandbox_manager)
+    console = context.console
+    
+    console.print("[cyan]Starting sandbox...[/cyan]")
+    if not sandbox_manager.start_container():
+        console.print("[bold red]Failed to start sandbox container.[/bold red]")
+        raise typer.Exit(1)
+    
+    try:
+        # Data setup logic from original script
+        details = context.sandbox_details
+        dataset_path = cast(Path, context.dataset_path)
+        if details["is_exec_mode"] and hasattr(sandbox_manager, "set_data"):
+            sandbox_manager.set_data(dataset_path, context.resources)
+        else:
+            SANDBOX_DATA_PATH = "/workspace/dataset.h5ad" # Or get from context
+            details["copy_cmd"](str(dataset_path), f"{details['handle']}:{SANDBOX_DATA_PATH}")
+            for hp, cp in context.resources:
+                details["copy_cmd"](str(hp), f"{details['handle']}:{cp}")
 
-# --- Subcommands (interactive, auto) are unchanged ---
+        # Run the main agent loop
+        run_agent_session(
+            console=console,
+            agent_system=cast(AgentSystem, context.agent_system),
+            driver_agent=cast(AgentSystem, context.agent_system).get_agent(cast(str, context.driver_agent_name)),
+            roster_instructions=cast(str, context.roster_instructions),
+            analysis_context=cast(str, context.analysis_context),
+            llm_client=cast(object, context.llm_client),
+            sandbox_manager=sandbox_manager,
+            history=history,
+            is_auto=is_auto,
+            max_turns=max_turns
+        )
+    finally:
+        console.print("[cyan]Stopping sandbox...[/cyan]")
+        sandbox_manager.stop_container()
 
 @run_app.command("interactive")
 def run_interactive(ctx: typer.Context):
     """Run the agent system in a manual, interactive chat session."""
     context: AppContext = ctx.obj
-    context.console.print("\n[bold blue]🚀 Starting Interactive Mode...[/bold blue]")
+    console = context.console
+    console.print("\n[bold blue]🚀 Starting Interactive Mode...[/bold blue]")
     
     history = context.initial_history[:]
     history.append({"role": "user", "content": "Beginning interactive session. What is the plan?"})
     
-    run_agent_session(
-        console=context.console,
-        agent_system=cast(AgentSystem, context.agent_system),
-        driver_agent=cast(AgentSystem, context.agent_system).get_agent(cast(str, context.driver_agent_name)),
-        roster_instructions=cast(str, context.roster_instructions),
-        analysis_context=cast(str, context.analysis_context),
-        llm_client=cast(object, context.llm_client),
-        sandbox_manager=cast(SandboxManager, context.sandbox_manager),
-        history=history,
-        is_auto=False
-    )
+    _setup_and_run_session(context, history, is_auto=False, max_turns=-1)
 
 @run_app.command("auto")
 def run_auto(
@@ -198,24 +207,14 @@ def run_auto(
 ):
     """Run the agent system automatically for a set number of turns."""
     context: AppContext = ctx.obj
+    console = context.console
     
     if prompt is None:
         prompt = Prompt.ask("Enter the initial prompt for the automated run", default="Analyze this dataset.")
 
-    context.console.print(f"\n[bold green]🚀 Starting Automated Mode for {turns} turns...[/bold green]")
+    console.print(f"\n[bold green]🚀 Starting Automated Mode for {turns} turns...[/bold green]")
     
     history = context.initial_history[:]
     history.append({"role": "user", "content": prompt})
     
-    run_agent_session(
-        console=context.console,
-        agent_system=cast(AgentSystem, context.agent_system),
-        driver_agent=cast(AgentSystem, context.agent_system).get_agent(cast(str, context.driver_agent_name)),
-        roster_instructions=cast(str, context.roster_instructions),
-        analysis_context=cast(str, context.analysis_context),
-        llm_client=cast(object, context.llm_client),
-        sandbox_manager=cast(SandboxManager, context.sandbox_manager),
-        history=history,
-        is_auto=True,
-        max_turns=turns
-    )
+    _setup_and_run_session(context, history, is_auto=True, max_turns=turns)
