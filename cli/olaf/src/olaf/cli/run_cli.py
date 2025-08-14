@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 
 # Import your project's modules and shared configuration
 from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE
-
 from olaf.agents.AgentSystem import AgentSystem
 from olaf.core.io_helpers import collect_resources
 from olaf.core.sandbox_management import (init_docker, init_singularity, init_singularity_exec)
@@ -99,17 +98,17 @@ def main_run_callback(
     driver_agent: str = typer.Option(None, "--driver-agent", "-d", help="Name of the agent to start with."),
     dataset: Path = typer.Option(None, "--dataset", "-ds", help="Path to the dataset file (.h5ad).", readable=True),
     resources_dir: Path = typer.Option(None, "--resources", help="Path to a directory of resource files to mount.", exists=True, file_okay=False),
-    llm_backend: str = typer.Option("chatgpt", "--llm", help="LLM backend to use.", case_sensitive=False),
+    llm_backend: str = typer.Option(None, "--llm", help="LLM backend to use: 'chatgpt' or 'ollama'."),
     ollama_host: str = typer.Option("http://localhost:11434", "--ollama-host", help="Base URL for Ollama backend."),
-    sandbox: str = typer.Option(None, "--sandbox", help="Sandbox backend to use: 'docker', 'singularity', or 'singularity-exec'."), # <-- Changed default
+    sandbox: str = typer.Option(None, "--sandbox", help="Sandbox backend to use: 'docker', 'singularity', or 'singularity-exec'."),
     force_refresh: bool = typer.Option(False, "--force-refresh", help="Force refresh/rebuild of the sandbox environment."),
 ):
     load_dotenv(dotenv_path=ENV_FILE)
+
     app_context = AppContext()
     console = app_context.console
     ctx.obj = app_context
 
-    # Steps 1, 2, and 3 are unchanged
     if blueprint is None:
         blueprint = _prompt_for_file(console, DEFAULT_AGENT_DIR, PACKAGE_AGENTS_DIR, ".json", "Agent System Blueprint")
     app_context.agent_system = AgentSystem.load_from_json(str(blueprint))
@@ -124,14 +123,8 @@ def main_run_callback(
     if dataset is None:
         dataset = _prompt_for_file(console, get_datasets_dir(), PACKAGE_DATASETS_DIR, ".h5ad", "Dataset")
 
-    # --- Step 4. Configure Sandbox (Corrected Logic) ---
-    # Prompt for sandbox if not provided as a flag
     if sandbox is None:
-        sandbox = Prompt.ask(
-            "Choose a sandbox backend",
-            choices=["docker", "singularity", "singularity-exec"],
-            default="docker"
-        )
+        sandbox = Prompt.ask("Choose a sandbox backend", choices=["docker", "singularity", "singularity-exec"], default="docker")
         
     console.print(f"[cyan]Initializing sandbox backend: {sandbox}[/cyan]")
     script_dir = Path(__file__).resolve().parent
@@ -145,11 +138,18 @@ def main_run_callback(
         SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
         manager_class, _, _, _, _ = init_singularity_exec(script_dir, SANDBOX_DATA_PATH, subprocess, console, force_refresh=force_refresh)
     else:
-        raise typer.BadParameter(f"Unknown sandbox type '{sandbox}'. Supported types are 'docker', 'singularity', 'singularity-exec'.")
+        raise typer.BadParameter(f"Unknown sandbox type '{sandbox}'.")
 
     app_context.sandbox_manager = manager_class()
 
-    # Step 5 and 6 are unchanged
+    # --- Step 5. Configure LLM Client (Corrected Logic) ---
+    if llm_backend is None:
+        llm_backend = Prompt.ask("Choose an LLM backend", choices=["chatgpt", "ollama"], default="chatgpt")
+
+    # Only ask for Ollama host if it's the selected backend and the user hasn't already provided a custom host via flags.
+    if llm_backend == "ollama" and ollama_host == "http://localhost:11434":
+         ollama_host = Prompt.ask("Enter the Ollama base URL", default="http://localhost:11434")
+
     console.print(f"[cyan]Initializing LLM backend: {llm_backend}[/cyan]")
     if llm_backend == "chatgpt":
         from openai import OpenAI
