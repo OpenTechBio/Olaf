@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE
 from olaf.agents.AgentSystem import Agent, AgentSystem
 from olaf.core.io_helpers import collect_resources
-from olaf.core.sandbox_management import (init_docker, init_singularity, init_singularity_exec)
+from olaf.core.sandbox_management import (init_docker, init_singularity_exec)
 from olaf.execution.runner import run_agent_session, SandboxManager
 from olaf.datasets.czi_datasets import get_datasets_dir
 
@@ -64,7 +64,6 @@ def _prompt_for_benchmark_module(console: Console) -> Optional[Path]:
     """Finds and prompts the user to select an auto metric script."""
     console.print("[bold]Select a benchmark module (optional):[/bold]")
     
-    # Filter out helper scripts
     modules = [
         m for m in PACKAGE_AUTO_METRICS_DIR.glob("*.py")
         if m.name not in ["__init__.py", "AutoMetric.py"]
@@ -116,7 +115,7 @@ def main_run_callback(
     resources_dir: Path = typer.Option(None, "--resources", help="Path to a directory of resource files to mount.", exists=True, file_okay=False),
     llm_backend: str = typer.Option(None, "--llm", help="LLM backend to use: 'chatgpt' or 'ollama'."),
     ollama_host: str = typer.Option("http://localhost:11434", "--ollama-host", help="Base URL for Ollama backend."),
-    sandbox: str = typer.Option(None, "--sandbox", help="Sandbox backend to use: 'docker', 'singularity', or 'singularity-exec'."),
+    sandbox: str = typer.Option(None, "--sandbox", help="Sandbox backend to use: 'docker' or 'singularity'."),
     force_refresh: bool = typer.Option(False, "--force-refresh", help="Force refresh/rebuild of the sandbox environment."),
 ):
     load_dotenv(dotenv_path=ENV_FILE)
@@ -140,7 +139,7 @@ def main_run_callback(
     app_context.dataset_path = dataset
 
     if sandbox is None:
-        sandbox = Prompt.ask("Choose a sandbox backend", choices=["docker", "singularity", "singularity-exec"], default="docker")
+        sandbox = Prompt.ask("Choose a sandbox backend", choices=["docker", "singularity"], default="docker")
     
     console.print(f"[cyan]Initializing sandbox backend: {sandbox}[/cyan]")
     script_dir = Path(__file__).resolve().parent
@@ -149,13 +148,13 @@ def main_run_callback(
     if sandbox == "docker":
         manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_docker(script_dir, subprocess, console, force_refresh=force_refresh)
     elif sandbox == "singularity":
-        manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_singularity(script_dir, subprocess, console, force_refresh=force_refresh)
-    elif sandbox == "singularity-exec":
+        # This now correctly maps to the 'singularity-exec' implementation
         manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_singularity_exec(script_dir, SANDBOX_DATA_PATH, subprocess, console, force_refresh=force_refresh)
     else:
-        raise typer.BadParameter(f"Unknown sandbox type '{sandbox}'.")
+        raise typer.BadParameter(f"Unknown sandbox type '{sandbox}'. Supported: 'docker', 'singularity'.")
     app_context.sandbox_manager = manager_class()
-    app_context.sandbox_details = {"handle": handle, "copy_cmd": copy_cmd, "is_exec_mode": sandbox == "singularity-exec"}
+    # This check now correctly identifies the exec-style singularity backend
+    app_context.sandbox_details = {"handle": handle, "copy_cmd": copy_cmd, "is_exec_mode": sandbox == "singularity"}
 
     if llm_backend is None:
         llm_backend = Prompt.ask("Choose an LLM backend", choices=["chatgpt", "ollama"], default="chatgpt")
@@ -226,7 +225,6 @@ def run_interactive(ctx: typer.Context):
     console = context.console
     console.print("\n[bold blue]🚀 Starting Interactive Mode...[/bold blue]")
 
-    # For consistency, allow selecting benchmarks in interactive mode too
     benchmark_module = _prompt_for_benchmark_module(console)
     
     history = context.initial_history[:]

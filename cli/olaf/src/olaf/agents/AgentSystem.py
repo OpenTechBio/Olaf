@@ -2,7 +2,15 @@ import json
 from typing import Dict, Optional
 from pathlib import Path
 
-CODE_SAMPLES_DIR = Path("cli/code_samples")
+# Import the central OLAF_HOME path from our config module
+from olaf.config import OLAF_HOME
+
+# 1. The user-specific directory (for custom samples)
+USER_CODE_SAMPLES_DIR = OLAF_HOME / "code_samples"
+USER_CODE_SAMPLES_DIR.mkdir(exist_ok=True) # Ensure it exists
+
+# 2. The package-internal directory (for default samples), found relative to this file
+PACKAGE_CODE_SAMPLES_DIR = Path(__file__).resolve().parent.parent / "code_samples"
 
 
 class Command:
@@ -19,7 +27,6 @@ class Command:
 
 class Agent:
     """Represents a single agent in the system."""
-    # Updated to accept a dictionary of loaded code samples
     def __init__(self, name: str, prompt: str, commands: Dict[str, Command], code_samples: Dict[str, str]):
         self.name = name
         self.prompt = prompt
@@ -27,7 +34,6 @@ class Agent:
         self.code_samples = code_samples
 
     def __repr__(self) -> str:
-        # Updated to show if code samples are loaded
         sample_keys = list(self.code_samples.keys())
         return f"Agent(name='{self.name}', commands={list(self.commands.keys())}, samples={sample_keys})"
 
@@ -67,11 +73,10 @@ class AgentSystem:
     @classmethod
     def load_from_json(cls, file_path: str) -> 'AgentSystem':
         """
-        Parses the JSON blueprint, reads code sample files from disk,
-        and builds the AgentSystem data structure.
+        Parses the JSON blueprint, reads code sample files from disk from both user
+        and package locations, and builds the AgentSystem data structure.
         """
         print(f"Loading agent system from: {file_path}")
-        blueprint_path = Path(file_path).parent
         with open(file_path, 'r') as f:
             config = json.load(f)
 
@@ -79,7 +84,6 @@ class AgentSystem:
         agents: Dict[str, Agent] = {}
         
         for agent_name, agent_data in config.get('agents', {}).items():
-            # --- Load Commands (unchanged) ---
             commands: Dict[str, Command] = {}
             for cmd_name, cmd_data in agent_data.get('neighbors', {}).items():
                 commands[cmd_name] = Command(
@@ -89,29 +93,38 @@ class AgentSystem:
                 )
 
             loaded_samples: Dict[str, str] = {}
-            # Get the list of filenames from the JSON, e.g., ["load_data.py", "plot.py"]
             sample_filenames = agent_data.get('code_samples', [])
             
             if sample_filenames:
                 print(f"  Loading code samples for '{agent_name}'...")
                 for filename in sample_filenames:
-                    try:
-                        # Construct the full path to the sample file
-                        sample_path = CODE_SAMPLES_DIR / filename
-                        # Read the file content and store it in the dictionary
-                        loaded_samples[filename] = sample_path.read_text(encoding="utf-8")
-                        print(f"    ✅ Loaded {filename}")
-                    except FileNotFoundError:
-                        print(f"    ❌ WARNING: Code sample file not found and will be skipped: {sample_path}")
-                    except Exception as e:
-                        print(f"    ❌ ERROR: Could not read code sample file {sample_path}: {e}")
+                    user_path = USER_CODE_SAMPLES_DIR / filename
+                    package_path = PACKAGE_CODE_SAMPLES_DIR / filename
+                    
+                    # Default to package path, but overwrite if user path exists
+                    path_to_load = None
+                    source_label = ""
+                    if user_path.exists():
+                        path_to_load = user_path
+                        source_label = "User"
+                    elif package_path.exists():
+                        path_to_load = package_path
+                        source_label = "Package"
 
-            # --- Create Agent with loaded samples ---
+                    if path_to_load:
+                        try:
+                            loaded_samples[filename] = path_to_load.read_text(encoding="utf-8")
+                            print(f"    ✅ Loaded {filename} (from {source_label})")
+                        except Exception as e:
+                            print(f"    ❌ ERROR: Could not read code sample file {path_to_load}: {e}")
+                    else:
+                        print(f"    ❌ WARNING: Code sample file '{filename}' not found in any location.")
+
             agent = Agent(
                 name=agent_name,
                 prompt=agent_data['prompt'],
                 commands=commands,
-                code_samples=loaded_samples  # Pass the dictionary of loaded code
+                code_samples=loaded_samples
             )
             agents[agent_name] = agent
         
