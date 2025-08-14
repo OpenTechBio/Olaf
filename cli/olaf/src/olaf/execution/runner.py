@@ -1,4 +1,4 @@
-# olaf/testing/runner.py
+# olaf/execution/runner.py
 from __future__ import annotations
 
 import json
@@ -13,9 +13,8 @@ from rich.console import Console
 from rich.table import Table
 
 # --- Project-specific Imports ---
-# These imports assume your project structure allows them.
-# You may need to adjust them based on your final package layout.
 try:
+    from olaf.config import OLAF_HOME
     from olaf.agents.AgentSystem import Agent, AgentSystem
     from olaf.core.io_helpers import display, extract_python_code, format_execute_response
 except ImportError as e:
@@ -24,7 +23,6 @@ except ImportError as e:
 
 
 # --- Type Hinting & Base Classes ---
-# Define a base class for sandbox managers to ensure a consistent interface.
 class SandboxManager:
     """Abstract base class for sandbox interaction."""
     def start_container(self) -> bool:
@@ -38,7 +36,7 @@ class SandboxManager:
 
 # --- Constants and Path Setup ---
 _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
-_OUTPUTS_DIR = Path("outputs")
+_OUTPUTS_DIR = OLAF_HOME / "runs"
 _SNIPPET_DIR = _OUTPUTS_DIR / "snippets"
 _LEDGER_PATH = _OUTPUTS_DIR / f"benchmark_history_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.jsonl"
 
@@ -112,7 +110,6 @@ def run_benchmark(
         stdout = exec_result.get("stdout", "")
         result_dict = {}
         try:
-            # The JSON result is expected to be the last line of stdout
             result_dict = json.loads(stdout.strip().splitlines()[-1])
         except (json.JSONDecodeError, IndexError) as e:
             console.print(f"[yellow]Warning: Could not parse JSON from stdout: {e}[/yellow]")
@@ -155,14 +152,19 @@ def run_agent_session(
 ):
     """
     Main driver for both interactive and automated agent execution sessions.
-    This is the core, refactored loop from your original script.
     """
     from rich.prompt import Prompt
     _init_paths()
     
+    # --- Display the initial context provided by the CLI ---
+    for message in history:
+        role = message.get("role", "unknown")
+        content = message.get("content", "")
+        if role in ["system", "user"]:
+            display(console, role, content)
+            
     current_agent = driver_agent
     turn = 0
-    turns_left = max_turns
     last_code_snippet: str | None = None
 
     while True:
@@ -174,9 +176,8 @@ def run_agent_session(
         console.print(f"\n[bold]LLM call (turn {turn})…[/bold]")
         
         try:
-            # Assuming the llm_client has an OpenAI-compatible interface
             resp = llm_client.chat.completions.create(
-                model="gpt-4o",  # This could be a parameter
+                model="gpt-4o",
                 messages=history,
                 temperature=0.7,
             )
@@ -196,10 +197,12 @@ def run_agent_session(
                 console.print(f"[yellow]🔄 Routing to '{target_agent_name}' via {cmd}[/yellow]")
                 history.append({"role": "assistant", "content": f"🔄 Routing to **{target_agent_name}** (command `{cmd}`)"})
                 current_agent = new_agent
-                
-                # Rebuild system prompt for the new agent
                 system_prompt = (roster_instructions + "\n\n" + current_agent.get_full_prompt(agent_system.global_policy) + "\n\n" + analysis_context)
+                # We replace the last system prompt with the new one for the new agent
                 history.insert(0, {"role": "system", "content": system_prompt})
+                # Remove the old system prompt to avoid confusion
+                if len(history) > 1 and history[1].get("role") == "system":
+                    history.pop(1)
                 continue
 
         code = extract_python_code(msg)
@@ -211,7 +214,6 @@ def run_agent_session(
             history.append({"role": "user", "content": feedback})
             display(console, "user", feedback)
 
-        # --- Mode-specific logic ---
         if is_auto:
             if benchmark_modules:
                 result_str = run_benchmark(
@@ -222,9 +224,8 @@ def run_agent_session(
                 display(console, "user", result_str)
             console.print(f"[yellow]Auto-continuing... {turn}/{max_turns} turns complete.[/yellow]")
         else:
-            # Interactive mode input loop
             while True:
-                prompt_text = "\n[bold]Next message ('benchmark' to run, 'exit' to quit)[/bold]"
+                prompt_text = "\n[bold]Next message ('benchmark' to run selected benchmark, 'exit' to quit)[/bold]"
                 try:
                     user_input = Prompt.ask(prompt_text, default="").strip()
                 except (EOFError, KeyboardInterrupt):
@@ -238,7 +239,7 @@ def run_agent_session(
                     if benchmark_modules:
                         for bm_module in benchmark_modules:
                             run_benchmark(console, sandbox_manager, bm_module, is_auto=False)
-                        continue  # Re-prompt after running benchmarks
+                        continue
                     else:
                         console.print("[yellow]No benchmark modules were specified at startup.[/yellow]")
                         continue
@@ -246,4 +247,4 @@ def run_agent_session(
                 if user_input:
                     history.append({"role": "user", "content": user_input})
                     display(console, "user", user_input)
-                break  # Exit input loop and proceed to next agent turn
+                break

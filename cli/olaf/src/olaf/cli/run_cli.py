@@ -21,6 +21,9 @@ PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_AGENTS_DIR = PACKAGE_ROOT / "agents"
 PACKAGE_DATASETS_DIR = PACKAGE_ROOT / "datasets"
 
+# This is the static path where the dataset will ALWAYS be inside the container
+SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
+
 
 def _prompt_for_file(
     console: Console, user_dir: Path, package_dir: Path, extension: str, prompt_title: str
@@ -73,7 +76,6 @@ class AppContext:
         self.initial_history: List[dict] | None = None
         self.dataset_path: Path | None = None
         self.resources: List[Tuple[Path, str]] = []
-        # Store sandbox details
         self.sandbox_details: dict = {}
 
 @run_app.callback(invoke_without_command=True)
@@ -100,7 +102,7 @@ def main_run_callback(
     if driver_agent is None:
         driver_agent = _prompt_for_driver(console, app_context.agent_system)
     if driver_agent not in app_context.agent_system.agents:
-        raise typer.BadParameter(f"Driver agent '{driver_agent}' not found in blueprint.")
+        raise typer.BadParameter(f"Driver agent '{driver_agent}' not found.")
     app_context.driver_agent_name = driver_agent
     app_context.roster_instructions = app_context.agent_system.get_instructions()
     
@@ -120,7 +122,6 @@ def main_run_callback(
     elif sandbox == "singularity":
         manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_singularity(script_dir, subprocess, console, force_refresh=force_refresh)
     elif sandbox == "singularity-exec":
-        SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
         manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_singularity_exec(script_dir, SANDBOX_DATA_PATH, subprocess, console, force_refresh=force_refresh)
     else:
         raise typer.BadParameter(f"Unknown sandbox type '{sandbox}'.")
@@ -143,7 +144,11 @@ def main_run_callback(
         raise typer.BadParameter(f"Unknown LLM backend '{llm_backend}'.")
 
     app_context.resources = collect_resources(console, resources_dir) if resources_dir else []
-    app_context.analysis_context = textwrap.dedent(f"Dataset path: **{dataset.name}**\n...")
+    
+    # --- CORRECTED ANALYSIS CONTEXT ---
+    # Always use the static in-container path for the prompt, not the host path.
+    app_context.analysis_context = textwrap.dedent(f"Dataset path: **{SANDBOX_DATA_PATH}**\n...")
+    
     driver = app_context.agent_system.get_agent(driver_agent)
     system_prompt = (app_context.roster_instructions + "\n\n" + driver.get_full_prompt(app_context.agent_system.global_policy) + "\n\n" + app_context.analysis_context)
     app_context.initial_history = [{"role": "system", "content": system_prompt}]
@@ -154,23 +159,24 @@ def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, ma
     console = context.console
     
     console.print("[cyan]Starting sandbox...[/cyan]")
+    
+    # For exec mode, we must configure the mounts *before* starting.
+    details = context.sandbox_details
+    dataset_path = cast(Path, context.dataset_path)
+    if details["is_exec_mode"] and hasattr(sandbox_manager, "set_data"):
+        sandbox_manager.set_data(dataset_path, context.resources)
+
     if not sandbox_manager.start_container():
         console.print("[bold red]Failed to start sandbox container.[/bold red]")
         raise typer.Exit(1)
     
     try:
-        # Data setup logic from original script
-        details = context.sandbox_details
-        dataset_path = cast(Path, context.dataset_path)
-        if details["is_exec_mode"] and hasattr(sandbox_manager, "set_data"):
-            sandbox_manager.set_data(dataset_path, context.resources)
-        else:
-            SANDBOX_DATA_PATH = "/workspace/dataset.h5ad" # Or get from context
+        # For non-exec modes, we copy data *after* starting.
+        if not details["is_exec_mode"]:
             details["copy_cmd"](str(dataset_path), f"{details['handle']}:{SANDBOX_DATA_PATH}")
             for hp, cp in context.resources:
                 details["copy_cmd"](str(hp), f"{details['handle']}:{cp}")
 
-        # Run the main agent loop
         run_agent_session(
             console=console,
             agent_system=cast(AgentSystem, context.agent_system),
