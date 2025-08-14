@@ -1,13 +1,14 @@
 # olaf/cli/run_cli.py
 import os
+import re
 import textwrap
 from pathlib import Path
-from typing import List, Tuple, cast
+from typing import List, Tuple, cast, Optional
 import subprocess
 
 import typer
 from rich.console import Console
-from rich.prompt import Prompt
+from rich.prompt import Prompt, IntPrompt
 from dotenv import load_dotenv
 
 from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE
@@ -20,8 +21,8 @@ from olaf.datasets.czi_datasets import get_datasets_dir
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_AGENTS_DIR = PACKAGE_ROOT / "agents"
 PACKAGE_DATASETS_DIR = PACKAGE_ROOT / "datasets"
+PACKAGE_AUTO_METRICS_DIR = PACKAGE_ROOT / "auto_metrics"
 
-# This is the static path where the dataset will ALWAYS be inside the container
 SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
 
 
@@ -54,9 +55,37 @@ def _prompt_for_file(
     return found_files[int(choice_str) - 1]['path']
 
 def _prompt_for_driver(console: Console, system: AgentSystem) -> str:
+    """Prompts the user to select a driver agent from the loaded system."""
     console.print("[bold]Select a driver agent:[/bold]")
     agents = list(system.agents.keys())
     return Prompt.ask("Enter the name of the driver agent", choices=agents, default=agents[0])
+
+def _prompt_for_benchmark_module(console: Console) -> Optional[Path]:
+    """Finds and prompts the user to select an auto metric script."""
+    console.print("[bold]Select a benchmark module (optional):[/bold]")
+    
+    # Filter out helper scripts
+    modules = [
+        m for m in PACKAGE_AUTO_METRICS_DIR.glob("*.py")
+        if m.name not in ["__init__.py", "AutoMetric.py"]
+    ]
+    
+    if not modules:
+        console.print("[yellow]No benchmark modules found.[/yellow]")
+        return None
+        
+    for i, mod in enumerate(modules, 1):
+        console.print(f"  [cyan]{i}[/cyan]: {mod.name}")
+    
+    console.print(f"  [cyan]{len(modules) + 1}[/cyan]: Skip")
+
+    choices = [str(i) for i in range(1, len(modules) + 2)]
+    choice_str = Prompt.ask("Enter the number of your choice", choices=choices, default=str(len(modules) + 1))
+    choice_idx = int(choice_str) - 1
+
+    if choice_idx == len(modules):
+        return None
+    return modules[choice_idx]
 
 run_app = typer.Typer(
     name="run",
@@ -145,22 +174,19 @@ def main_run_callback(
 
     app_context.resources = collect_resources(console, resources_dir) if resources_dir else []
     
-    # --- CORRECTED ANALYSIS CONTEXT ---
-    # Always use the static in-container path for the prompt, not the host path.
     app_context.analysis_context = textwrap.dedent(f"Dataset path: **{SANDBOX_DATA_PATH}**\n...")
     
     driver = app_context.agent_system.get_agent(driver_agent)
     system_prompt = (app_context.roster_instructions + "\n\n" + driver.get_full_prompt(app_context.agent_system.global_policy) + "\n\n" + app_context.analysis_context)
     app_context.initial_history = [{"role": "system", "content": system_prompt}]
 
-def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, max_turns: int):
+def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, max_turns: int, benchmark_modules: Optional[List[Path]] = None):
     """Helper to start, run, and stop the sandbox session."""
     sandbox_manager = cast(SandboxManager, context.sandbox_manager)
     console = context.console
     
     console.print("[cyan]Starting sandbox...[/cyan]")
     
-    # For exec mode, we must configure the mounts *before* starting.
     details = context.sandbox_details
     dataset_path = cast(Path, context.dataset_path)
     if details["is_exec_mode"] and hasattr(sandbox_manager, "set_data"):
@@ -171,7 +197,6 @@ def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, ma
         raise typer.Exit(1)
     
     try:
-        # For non-exec modes, we copy data *after* starting.
         if not details["is_exec_mode"]:
             details["copy_cmd"](str(dataset_path), f"{details['handle']}:{SANDBOX_DATA_PATH}")
             for hp, cp in context.resources:
@@ -187,7 +212,8 @@ def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, ma
             sandbox_manager=sandbox_manager,
             history=history,
             is_auto=is_auto,
-            max_turns=max_turns
+            max_turns=max_turns,
+            benchmark_modules=benchmark_modules
         )
     finally:
         console.print("[cyan]Stopping sandbox...[/cyan]")
@@ -199,17 +225,27 @@ def run_interactive(ctx: typer.Context):
     context: AppContext = ctx.obj
     console = context.console
     console.print("\n[bold blue]🚀 Starting Interactive Mode...[/bold blue]")
+
+    # For consistency, allow selecting benchmarks in interactive mode too
+    benchmark_module = _prompt_for_benchmark_module(console)
     
     history = context.initial_history[:]
     history.append({"role": "user", "content": "Beginning interactive session. What is the plan?"})
     
-    _setup_and_run_session(context, history, is_auto=False, max_turns=-1)
+    _setup_and_run_session(
+        context,
+        history,
+        is_auto=False,
+        max_turns=-1,
+        benchmark_modules=[benchmark_module] if benchmark_module else None
+    )
 
 @run_app.command("auto")
 def run_auto(
     ctx: typer.Context,
-    prompt: str = typer.Option(None, "--prompt", "-p", help="Initial prompt for the auto run."),
-    turns: int = typer.Option(3, "--turns", "-t", help="Number of turns to run automatically."),
+    prompt: Optional[str] = typer.Option(None, "--prompt", "-p", help="Initial prompt for the auto run."),
+    turns: Optional[int] = typer.Option(None, "--turns", "-t", help="Number of turns to run automatically."),
+    benchmark_module: Optional[Path] = typer.Option(None, "--benchmark-module", "-bm", help="Path to the auto metric script.", readable=True, exists=True),
 ):
     """Run the agent system automatically for a set number of turns."""
     context: AppContext = ctx.obj
@@ -218,9 +254,21 @@ def run_auto(
     if prompt is None:
         prompt = Prompt.ask("Enter the initial prompt for the automated run", default="Analyze this dataset.")
 
+    if turns is None:
+        turns = IntPrompt.ask("Enter the number of turns for the automated run", default=3)
+    
+    if benchmark_module is None:
+        benchmark_module = _prompt_for_benchmark_module(console)
+
     console.print(f"\n[bold green]🚀 Starting Automated Mode for {turns} turns...[/bold green]")
     
     history = context.initial_history[:]
     history.append({"role": "user", "content": prompt})
     
-    _setup_and_run_session(context, history, is_auto=True, max_turns=turns)
+    _setup_and_run_session(
+        context,
+        history,
+        is_auto=True,
+        max_turns=turns,
+        benchmark_modules=[benchmark_module] if benchmark_module else None
+    )
