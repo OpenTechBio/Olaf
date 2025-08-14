@@ -6,7 +6,7 @@ It provides a robust framework for orchestrating multiple language agents that c
 
 At its core, OLAF allows you to define a team of specialized AI agents in a simple JSON "blueprint." You can then deploy this team into a secure sandbox (powered by Docker or Singularity) with a specific dataset and give them a high-level task to solve.
 
-## \#\# Key Features
+## Key Features
 
   * **Multi-Agent Blueprints:** Define agents, their specialized prompts, and how they delegate tasks to each other using a simple JSON configuration.
   * **Secure Sandboxing:** Execute agent-generated code in an isolated environment using **Docker** or **Singularity** to protect your host system.
@@ -15,9 +15,9 @@ At its core, OLAF allows you to define a team of specialized AI agents in a simp
   * **Configuration Management:** Easily manage API keys and application settings with built-in commands.
   * **User-Friendly CLI:** A guided, interactive experience helps you configure every run, with flags available to override settings for use in scripts.
 
-## \#\# Installation
+## Installation
 
-### \#\#\# Prerequisites
+### Prerequisites
 
 Before installing OLAF, you need to have the following installed and configured on your system:
 
@@ -27,10 +27,10 @@ Before installing OLAF, you need to have the following installed and configured 
       * **Docker:** Must be installed and the Docker daemon must be running.
       * **Singularity (Apptainer):** Must be installed on your system.
 
-### \#\#\# Install from PyPI (Recommended)
+### Install from PyPI (Recommended)
 Coming soon!
 
-### \#\#\# Install from Source (For Developers)
+### Install from Source (For Developers)
 
 To install the latest development version, you can clone the repository and install it in editable mode:
 
@@ -42,11 +42,11 @@ pip install -e .
 
 -----
 
-## \#\# 🚀 Quick Start Guide
+## 🚀 Quick Start Guide
 
 This guide will walk you through setting up your API key, downloading a dataset, and launching your first interactive agent session in just a few steps.
 
-### \#\#\# Step 1: Configure Your API Key
+### Step 1: Configure Your API Key
 
 First, tell OLAF about your OpenAI API key. This is a one-time setup.
 
@@ -56,7 +56,7 @@ olaf config set-openai-key "sk-YourSecretKeyGoesHere"
 
 Your key will be stored securely in a local `.env` file within the OLAF configuration directory.
 
-### \#\#\# Step 2: Download a Dataset
+### Step 2: Download a Dataset
 
 Next, let's get some data for our agents to analyze. Run the `datasets` command to browse and download a sample dataset from the CZI CELLxGENE Census.
 
@@ -67,7 +67,7 @@ olaf datasets
 
 Follow the prompts to list versions and datasets, then use the `download` command as instructed.
 
-### \#\#\# Step 3: Run an Agent System\!
+### Step 3: Run an Agent System\!
 
 Now you're ready to run an agent system. The `run` command is fully interactive if you don't provide any flags. It will guide you through selecting a blueprint, a dataset, and a sandbox environment.
 
@@ -87,11 +87,11 @@ After configuration, the session will begin, and you can start giving instructio
 
 -----
 
-## \#\# Command Reference
+## Command Reference
 
 OLAF's commands are organized into logical groups.
 
-### \#\#\# `olaf run`
+### `olaf run`
 
 The main command for executing an agent system.
 
@@ -113,7 +113,7 @@ The main command for executing an agent system.
       --llm chatgpt
     ```
 
-### \#\#\# `olaf create-system`
+### `olaf create-system`
 
 Tools for building new agent system blueprints.
 
@@ -126,7 +126,7 @@ Tools for building new agent system blueprints.
     olaf create-system quick --name my-first-system
     ```
 
-### \#\#\# `olaf datasets`
+### `olaf datasets`
 
 Tools for managing datasets.
 
@@ -139,7 +139,7 @@ Tools for managing datasets.
     olaf datasets download --version stable --dataset-id "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     ```
 
-### \#\#\# `olaf config`
+### `olaf config`
 
 Manage your OLAF configuration.
 
@@ -150,7 +150,7 @@ Manage your OLAF configuration.
 
 -----
 
-## \#\# Configuration
+## Configuration
 
 OLAF stores all user-generated content and configuration in a central directory. You can override this location by setting the `OLAF_HOME` environment variable.
 
