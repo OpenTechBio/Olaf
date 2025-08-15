@@ -237,49 +237,37 @@ if __name__ == "__main__":
     urls = [
         "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
     ]
-
-    keywords = [
-    "Description only",          # func["description"]
-    "Signature only",            # func["definition"]
-    "Wiki first 5 sentences",    # first 5 wiki sentences
-    "Wiki first 10 sentences",   # first 10 wiki sentences
-    "Full Wikipedia",            # full wiki content
-    "Description + Signature",   # description + signature
-    "Description + Wiki snippet" # description + first 5 wiki sentences
-    ]
-
-
-    prompt = "SCIB-metrics Prinicipal Component Analysis"
-
+    keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"]
+    prompts= ["SCIB Metics Principal Component Analysis"]
 
     for i in range(len(urls)):
         url = urls[i]
-        keyword = keywords[i]
+        keyword = "Prinicipal Component Analysis"
         if not rag.url_exists(url):
             func = rag.extract_html(url)
             if func and func["description"]:
                 rag.add_function(func)
                 try:
                     search_results = wikipedia.search(keyword)
+                    print(search_results)
                     wiki_page = wikipedia.page(search_results[0]).content
                     wiki_sentences = re.split(r'(?<=[.!?]) +', wiki_page)
                 except:
                     wiki_sentences = []
     
-                # Create diverse embeddings
-                text_variants = [
-                    func["description"],                          # Just description
-                    func["definition"],                           # Just signature
-                    " ".join(wiki_sentences[:5]),                 # First 5 sentences of Wikipedia
-                    " ".join(wiki_sentences[:10]),                # First 10 sentences of Wikipedia
-                    " ".join(wiki_sentences) if wiki_sentences else "",  # Full Wikipedia content
-                    func["description"] + " " + func["definition"],     # Description + signature
-                    func["description"] + " " + " ".join(wiki_sentences[:5])  # Mixed content
-                ]
+                sentence_lengths = [1, 5, 10, 20, 30, None]
+                embedding_variants = []
     
-                for text in text_variants:
-                    rag.create_embeddings(text)
-
-    rag.queries.append(prompt)
+                for n in sentence_lengths:
+                    if n is None:
+                        text_variant = " ".join(wiki_sentences)
+                    else:
+                        wiki_part = " ".join(wiki_sentences[:n])
+                        text_variant = wiki_part + " " + func["description"]
+    
+                    print(f"[{n if n else 'full'} sentences] {text_variant[200:]}...")
+                    embedding = rag.create_embeddings(text_variant)
+                    embedding_variants.append(embedding)
+    rag.queries += prompts
     
     rag.cosine_distance_heatmap(keywords)
