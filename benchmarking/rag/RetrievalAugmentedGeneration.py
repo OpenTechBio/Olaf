@@ -176,20 +176,19 @@ class RetrievalAugmentedGeneration:
         
         plt.legend()
         plt.title("UMAP Projection of All Embeddings + Queries")
-        plt.tight_layout()
         
         filename = f"umap_all_queries_{random.randint(0, 100)}.png"
         plt.savefig(filename)
         console.log(f"[green]UMAP plot for all queries saved as {filename}[/green]")
         plt.close()
-
-    def cosine_distance_heatmap(self) -> None:
+        
+    def cosine_distance_heatmap(self, keywords: List[str]) -> None:
         if not self.embeddings or not self.queries:
             console.log("[yellow]No embeddings or queries to compare.")
             return
     
-        query_embeddings = self.model.encode(self.queries)  
-        embeddings_array = np.array(self.embeddings)        
+        query_embeddings = self.model.encode(self.queries)
+        embeddings_array = np.array(self.embeddings)
     
         # Compute cosine distances between queries and embeddings
         distances = sklearn.metrics.pairwise_distances(
@@ -200,22 +199,31 @@ class RetrievalAugmentedGeneration:
     
         # Labels
         row_labels = [f"Query {i+1}" for i in range(len(self.queries))]
-        col_labels = [f"Chunk {i+1}" for i in range(len(self.functions))]
+        col_labels = [f"Chunk {i+1}" for i in range(len(self.embeddings))]
     
         # Plot heatmap
-        plt.figure(figsize=(len(col_labels)*0.5 + 3, len(row_labels)*0.5 + 2))
+        plt.figure(figsize=(len(col_labels)*0.5 + 6, len(row_labels)*0.5 + 2))
         sns.heatmap(distances, square=False, annot=True, cbar=True, cmap='Blues',
                     xticklabels=col_labels, yticklabels=row_labels)
         plt.title("Cosine Distance Heatmap (Queries × Embeddings)")
         plt.xticks(rotation=45, ha="right", fontsize=8)
         plt.yticks(fontsize=8)
-        plt.tight_layout()
+    
+        # Build mapping text
+        query_map = "\n".join([f"Query {i+1}: {q}" for i, q in enumerate(self.queries)])
+        chunk_map = "\n".join([f"Chunk {i+1}: {kw}" for i, kw in enumerate(keywords)])
+    
+        # Add mapping text to right side of plot
+        plt.figtext(1.02, 0.5, f"{query_map}\n\n{chunk_map}",
+                    ha="left", va="center", fontsize=8)
+
     
         # Save
         filename = f"full_cosine_distance_heatmap_{random.randint(0, 100)}.png"
-        plt.savefig(filename)
+        plt.savefig(filename, bbox_inches="tight")
         console.log(f"[green]Full cosine distance heatmap saved as {filename}[/green]")
         plt.close()
+
 
 
     def clear(self) -> None:
@@ -227,41 +235,22 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     urls = [
-        "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html",
-        "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_mtx.html",
-        "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_h5ad.html",
-        "https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_10x_mtx.html"
+        "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
     ]
 
     keywords = [
-        "Principal component analysis",    # for scib_metrics.utils.pca
-        "Matrix market exchange format",   # for scanpy.read_mtx
-        "HDF5",                            # for scanpy.read_h5ad (since h5ad files are based on HDF5)
-        "10x Genomics"                     # for scanpy.read_10x_mtx
+    "Description only",          # func["description"]
+    "Signature only",            # func["definition"]
+    "Wiki first 5 sentences",    # first 5 wiki sentences
+    "Wiki first 10 sentences",   # first 10 wiki sentences
+    "Full Wikipedia",            # full wiki content
+    "Description + Signature",   # description + signature
+    "Description + Wiki snippet" # description + first 5 wiki sentences
     ]
 
-    prompts = [
-        # PCA
-        "How to perform principal component analysis?",
-        "Explain PCA usage in scib_metrics",
-    
-        # read_mtx
-        "How to read matrix market files with Scanpy?",
-        "Load sparse count data in Scanpy",
-    
-        # read_h5ad
-        "How to load h5ad files with Scanpy?",
-        "Usage of scanpy.read_h5ad",
-    
-        # read_10x_mtx
-        "How to read 10x Genomics data in Scanpy?",
-        "Explain scanpy.read_10x_mtx function"
-        ]
 
-    #WATCH VIDEO --> new transformer model may be less dependent on the length of the embedding, attention models work because of a learned relationship between tokens  
-    #experiment sentence length with query 
-    #experiment manually --> tell the agent works best
-    #try cosine similarity instead of umap, can try to do a heatmap
+    prompts = ["SCIB-metrics Prinicipal Component Analysis"]
+
 
     for i in range(len(urls)):
         url = urls[i]
@@ -272,12 +261,26 @@ if __name__ == "__main__":
                 rag.add_function(func)
                 try:
                     search_results = wikipedia.search(keyword)
-                    wiki_summary = wikipedia.summary(search_results[0], sentences=20)
+                    wiki_page = wikipedia.page(search_results[0]).content
+                    wiki_sentences = re.split(r'(?<=[.!?]) +', wiki_page)
                 except:
-                    wiki_summary = ""
-                embedding_text = wiki_summary + func["description"]
-                rag.create_embeddings(embedding_text)
+                    wiki_sentences = []
+    
+                # Create diverse embeddings
+                text_variants = [
+                    func["description"],                          # Just description
+                    func["definition"],                           # Just signature
+                    " ".join(wiki_sentences[:5]),                 # First 5 sentences of Wikipedia
+                    " ".join(wiki_sentences[:10]),                # First 10 sentences of Wikipedia
+                    " ".join(wiki_sentences) if wiki_sentences else "",  # Full Wikipedia content
+                    func["description"] + " " + func["definition"],     # Description + signature
+                    func["description"] + " " + " ".join(wiki_sentences[:5])  # Mixed content
+                ]
+    
+                for text in text_variants:
+                    rag.create_embeddings(text)
+
     for prompt in prompts:
         rag.query(prompt)
-    rag.umap_plot(keywords)
-    rag.cosine_distance_heatmap()
+    
+    rag.cosine_distance_heatmap(keywords)
