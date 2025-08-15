@@ -237,37 +237,54 @@ if __name__ == "__main__":
     urls = [
         "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
     ]
-    keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"]
-    prompts= ["SCIB Metics Principal Component Analysis"]
+    keywords = [
+    "Description only",          # func["description"]
+    "Signature only",            # func["definition"]
+    "Wiki first 5 sentences",    # first 5 wiki sentences
+    "Wiki first 10 sentences",   # first 10 wiki sentences
+    "Full Wikipedia",            # full wiki content
+    "Description + Signature",   # description + signature
+    "Description + Wiki snippet" # description + first 5 wiki sentences
+    ]
+    prompts = [
+        "Principal Component Analysis",  # fixed spelling
+        "PCA",
+        "SCIB-metrics Principal Component Analysis",  # fixed spelling
+        "SCIB-metrics PCA",
+        "Use the scib_metrics.utils.pca to perform principal component analysis",  # fixed spelling
+        "Use the scib_metrics.utils.pca",
+        "Use the scib_metrics library to perform pca",
+        "scib_metrics.utils.pca",
+        "Principal Component Analysis (PCA) is a method for reducing the dimensionality of a dataset. It identifies the directions (principal components) along which the data varies the most, allowing for a simpler representation while preserving as much information as possible.",
+        "Principal Component Analysis (PCA) is a statistical method that transforms high-dimensional data into a lower-dimensional form while retaining the most important variance.",
+        "Perform Principal Component Analysis (PCA) using the scib_metrics library. Use scib_metrics.utils.pca to compute the PCA and return the transformed dataset."
+    ]
+    
 
     for i in range(len(urls)):
         url = urls[i]
-        keyword = "Prinicipal Component Analysis"
+        keyword = "Principal Component Analysis"
         if not rag.url_exists(url):
             func = rag.extract_html(url)
             if func and func["description"]:
                 rag.add_function(func)
-                try:
-                    search_results = wikipedia.search(keyword)
-                    print(search_results)
-                    wiki_page = wikipedia.page(search_results[0]).content
-                    wiki_sentences = re.split(r'(?<=[.!?]) +', wiki_page)
-                except:
-                    wiki_sentences = []
-    
-                sentence_lengths = [1, 5, 10, 20, 30, None]
-                embedding_variants = []
-    
-                for n in sentence_lengths:
-                    if n is None:
-                        text_variant = " ".join(wiki_sentences)
-                    else:
-                        wiki_part = " ".join(wiki_sentences[:n])
-                        text_variant = wiki_part + " " + func["description"]
-    
-                    print(f"[{n if n else 'full'} sentences] {text_variant[200:]}...")
-                    embedding = rag.create_embeddings(text_variant)
-                    embedding_variants.append(embedding)
+                search_results = wikipedia.search(keyword)
+                wiki_page = wikipedia.page(search_results[0]).content
+                wiki_sentences = re.split(r'(?<=[.!?]) +', wiki_page)
+
+                # Create diverse embeddings
+                text_variants = [
+                    func["description"],                          # Just description
+                    func["definition"],                           # Just signature
+                    " ".join(wiki_sentences[:5]),                 # First 5 sentences of Wikipedia
+                    " ".join(wiki_sentences[:10]),                # First 10 sentences of Wikipedia
+                    " ".join(wiki_sentences) if wiki_sentences else "",  # Full Wikipedia content
+                    func["description"] + " " + func["definition"],     # Description + signature
+                    func["description"] + " " + " ".join(wiki_sentences[:5])  # Mixed content
+                ]
+   
+                for text in text_variants:
+                    print(text.strip())
+                    rag.create_embeddings(text)
     rag.queries += prompts
-    
     rag.cosine_distance_heatmap(keywords)
