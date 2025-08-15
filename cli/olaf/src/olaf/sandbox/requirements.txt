@@ -5,7 +5,7 @@ pandas==2.2.2
 scikit-learn==1.5.1
 numba==0.60.0
 statsmodels==0.14.2
-h5py==3.11.0
+h5py==3.10.0
 
 # Visualization
 matplotlib==3.9.1
@@ -48,5 +48,5 @@ scarches
 harmonypy
 
 # Additional Tools
-rapids-singlecell
+# rapids-singlecell
 scib-metrics

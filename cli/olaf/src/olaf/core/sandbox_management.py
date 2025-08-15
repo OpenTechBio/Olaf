@@ -1,6 +1,8 @@
+
 import time
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict
 from pathlib import Path
+
 import json
 
 from olaf.sandbox.benchmarking_sandbox_management import (
@@ -12,7 +14,6 @@ from olaf.sandbox.benchmarking_sandbox_management import (
 
 
 def init_docker(script_dir:str, subprocess, console, force_refresh:bool=False):
-    sandbox_dir = script_dir / "workspace"
     # --- optional force‑refresh logic --------------------------------------
     if force_refresh:
         console.print("[yellow]Forcing Docker sandbox refresh…[/yellow]")
@@ -31,49 +32,11 @@ def init_docker(script_dir:str, subprocess, console, force_refresh:bool=False):
 
     return _BackendManager, _SANDBOX_HANDLE, COPY_CMD, EXECUTE_ENDPOINT, STATUS_ENDPOINT
 
-def init_singularity(script_dir:str, subprocess, console, force_refresh:bool=False):
-    import olaf.sandbox.benchmarking_sandbox_management_singularity as sing
-    sandbox_dir = script_dir / "sandbox"
-
-    # optional force‑refresh
-    if force_refresh:
-        console.print("[yellow]Forcing Singularity sandbox refresh…[/yellow]")
-        try:
-            sing.stop_instance()
-        except Exception:
-            pass  # ignore if not running
-        if sing.SIF_PATH.exists():
-            sing.SIF_PATH.unlink()
-            console.print(
-                f"[green]Deleted {sing.SIF_PATH.name} – it will be re‑downloaded on next start.[/green]"
-            )
-
-    class _SingInstanceWrapper:
-        def start_container(self):
-            return sing.start_instance()
-
-        def stop_container(self):
-            return sing.stop_instance()
-
-    _BackendManager = _SingInstanceWrapper
-    _SANDBOX_HANDLE = sing.INSTANCE_NAME
-    _API_PORT = sing.API_PORT_HOST
-
-    def COPY_CMD(src: str, dst: str):
-        console.print(
-            f"[yellow]Singularity instance: ensure {src} is reachable at {dst} via bind mount.[/yellow]"
-        )
-
-    EXECUTE_ENDPOINT = f"http://localhost:{_API_PORT}/execute"
-    STATUS_ENDPOINT = f"http://localhost:{_API_PORT}/status"
-
-    return _BackendManager, _SANDBOX_HANDLE, COPY_CMD, EXECUTE_ENDPOINT, STATUS_ENDPOINT
 
 
 
 def init_singularity_exec(script_dir: str, sanbox_data_path, subprocess, console, force_refresh: bool = False):
     import olaf.sandbox.benchmarking_sandbox_management_singularity as sing
-    sandbox_dir = script_dir / "sandbox"
 
     # optional force‑refresh
     if force_refresh:
