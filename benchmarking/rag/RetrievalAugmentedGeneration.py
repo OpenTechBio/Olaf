@@ -249,7 +249,7 @@ if __name__ == "__main__":
     ]
 
 
-    prompts = ["SCIB-metrics Prinicipal Component Analysis"]
+    prompt = "SCIB-metrics Prinicipal Component Analysis"
 
 
     for i in range(len(urls)):
@@ -280,7 +280,6 @@ if __name__ == "__main__":
                 for text in text_variants:
                     rag.create_embeddings(text)
 
-    for prompt in prompts:
-        rag.query(prompt)
+    rag.queries.append(prompt)
     
     rag.cosine_distance_heatmap(keywords)
