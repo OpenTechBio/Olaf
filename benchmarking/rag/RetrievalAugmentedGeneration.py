@@ -35,7 +35,7 @@ FUNCTIONS_FILE = SCRIPT_DIR / "functions.jsonl"
 
 # ──────Class──────────────────────────────────────────────────────────
 class RetrievalAugmentedGeneration:
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    model = SentenceTransformer('intfloat/e5-large-v2')
 
     def __init__(self) -> None:
         self.embeddings = self.load_embeddings()
@@ -131,7 +131,7 @@ class RetrievalAugmentedGeneration:
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
-        return self.functions[idx]
+        return self.embeddings[idx]
 
     def umap_plot(self, keywords: List[str]) -> None:
         if not self.embeddings or not self.queries:
@@ -234,57 +234,31 @@ class RetrievalAugmentedGeneration:
 #─────────────────────────────────────────────
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
-    urls = [
-        "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
-    ]
-    keywords = [
-    "Description only",          # func["description"]
-    "Signature only",            # func["definition"]
-    "Wiki first 5 sentences",    # first 5 wiki sentences
-    "Wiki first 10 sentences",   # first 10 wiki sentences
-    "Full Wikipedia",            # full wiki content
-    "Description + Signature",   # description + signature
-    "Description + Wiki snippet" # description + first 5 wiki sentences
-    ]
-    prompts = [
-        "Principal Component Analysis",  # fixed spelling
-        "PCA",
-        "SCIB-metrics Principal Component Analysis",  # fixed spelling
-        "SCIB-metrics PCA",
-        "Use the scib_metrics.utils.pca to perform principal component analysis",  # fixed spelling
-        "Use the scib_metrics.utils.pca",
-        "Use the scib_metrics library to perform pca",
-        "scib_metrics.utils.pca",
-        "Principal Component Analysis (PCA) is a method for reducing the dimensionality of a dataset. It identifies the directions (principal components) along which the data varies the most, allowing for a simpler representation while preserving as much information as possible.",
-        "Principal Component Analysis (PCA) is a statistical method that transforms high-dimensional data into a lower-dimensional form while retaining the most important variance.",
-        "Perform Principal Component Analysis (PCA) using the scib_metrics library. Use scib_metrics.utils.pca to compute the PCA and return the transformed dataset."
-    ]
-    
+    urls = ["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html" ]
+    keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"] #this is used just to provide useful descriptions for the cosine distance heatmap
+    prompts = ["SCIB Metrics Principal Component Analysis"]
+
 
     for i in range(len(urls)):
         url = urls[i]
-        keyword = "Principal Component Analysis"
+        search_term = "Principal Component Analysis"
         if not rag.url_exists(url):
             func = rag.extract_html(url)
             if func and func["description"]:
                 rag.add_function(func)
-                search_results = wikipedia.search(keyword)
+                search_results = wikipedia.search(search_term)
                 wiki_page = wikipedia.page(search_results[0]).content
                 wiki_sentences = re.split(r'(?<=[.!?]) +', wiki_page)
+                sentence_lengths = [1, 5, 10, 20, 30, None]
+    
+                for n in sentence_lengths:
+                    if n is None:
+                        text_variant = " ".join(wiki_sentences)
+                    else:
+                        wiki_part = " ".join(wiki_sentences[:n])
+                        text_variant = func["description"] + " " + wiki_part 
 
-                # Create diverse embeddings
-                text_variants = [
-                    func["description"],                          # Just description
-                    func["definition"],                           # Just signature
-                    " ".join(wiki_sentences[:5]),                 # First 5 sentences of Wikipedia
-                    " ".join(wiki_sentences[:10]),                # First 10 sentences of Wikipedia
-                    " ".join(wiki_sentences) if wiki_sentences else "",  # Full Wikipedia content
-                    func["description"] + " " + func["definition"],     # Description + signature
-                    func["description"] + " " + " ".join(wiki_sentences[:5])  # Mixed content
-                ]
-   
-                for text in text_variants:
-                    print(text.strip())
-                    rag.create_embeddings(text)
+                    rag.create_embeddings(text_variant)
     rag.queries += prompts
+    
     rag.cosine_distance_heatmap(keywords)
