@@ -22,7 +22,7 @@ class OllamaClient:
         print(resp.choices[0].message.content)
     """
 
-    def __init__(self, host: str = "http://localhost:11434", model: str = "llama2"):
+    def __init__(self, host: str = "http://localhost:11434", model: str = "deepseek-r1:70b"):
         if not host.startswith(("http://", "https://")):          # ← add
             host = "http://" + host         
         self._host = host.rstrip("/")

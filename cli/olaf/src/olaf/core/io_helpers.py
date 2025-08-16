@@ -111,8 +111,8 @@ def load_bp_json(console) -> Path:
     If multiple are found, prompt user to choose or enter manual path.
     """
     search_paths = [
-        Path.home() / "Olaf" / "benchmarking" / "agents",
-        Path.cwd() / "benchmarking" / "agents",
+        Path.home() / "Olaf" / "cli" / "agents",
+        Path.cwd() / "cli" / "agents",
         Path.cwd() / "agents"
     ]
 
