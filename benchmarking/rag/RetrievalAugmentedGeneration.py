@@ -241,7 +241,7 @@ if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     urls = ["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"]
     sentence_lengths = [1, 5, 10, 15, 20, 25, 30, 40]
-    keywords = [f"{n sentences}" for n in sentence_lengths]
+    keywords = [f"{n} sentences" for n in sentence_lengths]
     prompts = ["SCIB Metrics Principal Component Analysis"]
 
     for i in range(len(urls)):
