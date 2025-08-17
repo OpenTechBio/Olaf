@@ -1,3 +1,5 @@
+
+
 import uuid
 import json
 import sys
@@ -247,7 +249,7 @@ if __name__ == "__main__":
     for i in range(len(urls)):
         url = urls[i]
         search_term = "Principal Component Analysis"
-        func = {"definition": ""}  # placeholder for your existing extract_html logic
+        func = rag.extract_html(url)
 
         if func:  
             search_results = wikipedia.search(search_term)
