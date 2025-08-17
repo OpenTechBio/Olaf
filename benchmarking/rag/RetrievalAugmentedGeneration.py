@@ -236,13 +236,12 @@ class RetrievalAugmentedGeneration:
         self.functions = []
         
 #─────────────────────────────────────────────
+
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     urls = ["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"]
     keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"]
     prompts = ["SCIB Metrics Principal Component Analysis"]
-
-    wiki = wikipediaapi.Wikipedia(language="en", user_agent="OlafBot")
 
     for i in range(len(urls)):
         url = urls[i]
@@ -250,8 +249,10 @@ if __name__ == "__main__":
         func = rag.extract_html(url)
         if func and func["description"]:
             search_results = wikipedia.search(search_term)
-            wiki_page = wiki.page(search_results[0])
-            full_text = wiki_page.text
+            wiki_title = search_results[0]
+            full_text = wikipedia.page(wiki_title).content
+
+            # Split full text into sentences
             sentences = [s.strip() for s in re.split(r'(?<=[.!?]) +', full_text) if s.strip()]
 
             sentence_lengths = [1, 5, 10, 20, 30, None]
@@ -260,13 +261,19 @@ if __name__ == "__main__":
                     text_variant = " ".join(sentences)  # full page
                 else:
                     text_variant = " ".join(sentences[:n])  # first n sentences
-
+                    
+                text_variant = re.sub(r"\\[a-zA-Z]+{.*?}", "", text)
+                text_variant = re.sub(r"\$.*?\$", "", text_variant)
+                text_variant = re.sub(r"\\\[.*?\\\]", "", text_variant, flags=re.DOTALL)
+                text_variant = re.sub(r"\$\$.*?\$\$", "", text_variant, flags=re.DOTALL)
+                text_variant = re.sub(r"{.*?}", "", text_variant)
+                text_variant = re.sub(r"\([a-zA-Z0-9_ ,.-]*\)", "", text_variant)
+                text_variant = re.sub(r"\s+", " ", text_variant).strip()
                 console.print(f"[red][bold]{n} sentences:\n")
-                console.print(f"{text_variant[-500:]}…")  # preview first 500 chars
+                console.print(f"{text_variant}…")  # preview last 500 chars
 
                 func["definition"] += str(n)
-                # rag.add_function(func)
-                # rag.create_embeddings(text_variant)
-
-    # rag.queries += prompts
-    # rag.cosine_distance_heatmap(keywords)
+                #rag.add_function(func)
+                #rag.create_embeddings(text_variant)
+    #rag.queries += prompts
+    #rag.cosine_distance_heatmap(keywords)
