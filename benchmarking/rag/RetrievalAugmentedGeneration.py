@@ -11,12 +11,11 @@ try:
     import requests
     from umap import UMAP
     import re 
-    import numpy as np
     from bs4 import BeautifulSoup
     from sentence_transformers import SentenceTransformer
     from validators import url as is_url
     from rich.console import Console
-    import wikipedia 
+    import wikipediaapi 
     import random 
     import matplotlib.pyplot as plt
     import numpy as np
@@ -35,7 +34,7 @@ FUNCTIONS_FILE = SCRIPT_DIR / "functions.jsonl"
 
 # ──────Class──────────────────────────────────────────────────────────
 class RetrievalAugmentedGeneration:
-    model = SentenceTransformer('intfloat/e5-large-v2')
+    model = SentenceTransformer('intfloat/e5-base-v2')
 
     def __init__(self) -> None:
         self.embeddings = self.load_embeddings()
@@ -123,7 +122,7 @@ class RetrievalAugmentedGeneration:
         return sims
 
     
-    def query(self, text_query: str) -> Optional[Dict[str, str]]:
+    def query(self, text_query: str) -> Optional[np.ndarray]:
         self.queries.append(text_query)
         if not self.embeddings:
             console.log("[yellow]No embeddings to compare.")
@@ -186,6 +185,10 @@ class RetrievalAugmentedGeneration:
         if not self.embeddings or not self.queries:
             console.log("[yellow]No embeddings or queries to compare.")
             return
+
+        if len(keywords) != len(self.embeddings):
+            console.log("[red]Number of keywords must match number of embeddings![/red]")
+            return
     
         query_embeddings = self.model.encode(self.queries)
         embeddings_array = np.array(self.embeddings)
@@ -234,31 +237,37 @@ class RetrievalAugmentedGeneration:
 #─────────────────────────────────────────────
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
-    urls = ["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html" ]
-    keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"] #this is used just to provide useful descriptions for the cosine distance heatmap
+    urls = ["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"]
+    keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"]
     prompts = ["SCIB Metrics Principal Component Analysis"]
 
+    wiki_wiki = wikipediaapi.Wikipedia("en")
 
     for i in range(len(urls)):
         url = urls[i]
         search_term = "Principal Component Analysis"
-        if not rag.url_exists(url):
-            func = rag.extract_html(url)
-            if func and func["description"]:
-                rag.add_function(func)
-                search_results = wikipedia.search(search_term)
-                wiki_page = wikipedia.page(search_results[0]).content
-                wiki_sentences = re.split(r'(?<=[.!?]) +', wiki_page)
-                sentence_lengths = [1, 5, 10, 20, 30, None]
-    
-                for n in sentence_lengths:
-                    if n is None:
-                        text_variant = " ".join(wiki_sentences)
-                    else:
-                        wiki_part = " ".join(wiki_sentences[:n])
-                        text_variant = func["description"] + " " + wiki_part 
+        func = rag.extract_html(url)
+        if func and func["description"]:
+            search_results = wikipedia.search(search_term)
+            wiki_page = wiki_wiki.page(search_results[0])
 
-                    rag.create_embeddings(text_variant)
-    rag.queries += prompts
-    
-    rag.cosine_distance_heatmap(keywords)
+            # Get full page text and split into sentences
+            full_text = wiki_page.text
+            sentences = [s.strip() for s in re.split(r'(?<=[.!?]) +', full_text) if s.strip()]
+
+            sentence_lengths = [1, 5, 10, 20, 30, None]
+            for n in sentence_lengths:
+                if n is None:
+                    text_variant = " ".join(sentences)  # full page
+                else:
+                    text_variant = " ".join(sentences[:n])  # first n sentences
+
+                console.print(f"[red][bold]{n} sentences:\n")
+                console.print(f"{text_variant[:500]}…")  # preview first 500 chars
+
+                func["definition"] += str(n)
+                # rag.add_function(func)
+                # rag.create_embeddings(text_variant)
+
+    # rag.queries += prompts
+    # rag.cosine_distance_heatmap(keywords)
