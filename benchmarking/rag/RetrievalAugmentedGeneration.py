@@ -37,7 +37,7 @@ FUNCTIONS_FILE = SCRIPT_DIR / "functions.jsonl"
 
 # ──────Class──────────────────────────────────────────────────────────
 class RetrievalAugmentedGeneration:
-    model = SentenceTransformer('intfloat/e5-base-v2')
+    model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
 
     def __init__(self) -> None:
         self.embeddings = self.load_embeddings()
@@ -247,32 +247,22 @@ if __name__ == "__main__":
     prompts = ["SCIB Metrics Principal Component Analysis"]
 
     for i in range(len(urls)):
-        url = urls[i]
-        search_term = "Principal Component Analysis"
-        func = rag.extract_html(url)
+        func = rag.extract_html(urls[i])
+        url = "https://en.wikipedia.org/wiki/Principal_component_analysis"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        content = soup.find("div", {"class": "mw-parser-output"})
+        # Remove unwanted tags: citations, tables, math, images, etc.
+        for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
+            tag.decompose()
+        text = content.get_text(separator=" ", strip=True)
+        page_sentences = re.split(r'(?<=[.!?]) +', text)
 
-        if func:  
-            search_results = wikipedia.search(search_term)
-            text_variant = wikipedia.page(search_results[0]).content
-
-            # Aggressive regex cleanup
-            text_variant = re.sub(r"\\[a-zA-Z]+{.*?}", "", text_variant)
-            text_variant = re.sub(r"\$.*?\$", "", text_variant)
-            text_variant = re.sub(r"\\\[.*?\\\]", "", text_variant, flags=re.DOTALL)
-            text_variant = re.sub(r"\$\$.*?\$\$", "", text_variant, flags=re.DOTALL)
-            text_variant = re.sub(r"{.*?}", "", text_variant)
-            text_variant = re.sub(r"\([a-zA-Z0-9_ ,.-]*\)", "", text_variant)
-            text_variant = re.sub(r"\s+", " ", text_variant).strip()
-
-            # Split cleaned text into sentences
-            page_sentences = re.split(r'(?<=[.!?]) +', text_variant)
-
-            for n in sentence_lengths:
-                sliced_text = " ".join(page_sentences[:n])  # join sentences for embedding/printing
-                console.print(f"[red][bold]{n} sentences:\n")
-                console.print(f"{sliced_text}…")  
-                rag.add_function(func)
-                rag.create_embeddings(sliced_text)
+        for n in sentence_lengths:
+            sliced_text = " ".join(page_sentences[:n])  # join sentences for embedding/printing
+            console.print(f"[red][bold]{n} sentences:\n")
+            console.print(f"{sliced_text}…")  
+            rag.create_embeddings(sliced_text)
 
     rag.queries += prompts
     rag.cosine_distance_heatmap(keywords)
