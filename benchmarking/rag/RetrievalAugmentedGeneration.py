@@ -238,6 +238,7 @@ class RetrievalAugmentedGeneration:
 #─────────────────────────────────────────────
 
 if __name__ == "__main__":
+    rag = RetrievalAugmentedGeneration()
     urls = ["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"]
     keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"]
     prompts = ["SCIB Metrics Principal Component Analysis"]
