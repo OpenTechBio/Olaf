@@ -238,31 +238,72 @@ class RetrievalAugmentedGeneration:
         self.functions = []
         
 #─────────────────────────────────────────────
-
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     urls = ["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"]
-    sentence_lengths = [1, 5, 10, 15, 20, 25, 30, 40]
-    keywords = [f"{n} sentences" for n in sentence_lengths]
-    prompts = ["SCIB Metrics Principal Component Analysis"]
+    
+    sentence_lengths = list(range(5, 51, 5))  
+    sentence_lengths = [1] + sentence_lengths  
 
+    prompts = [
+    "Perform Principal Component Analysis on this dataset.",
+    "Use PCA to reduce the dimensionality of the data.",
+    "Apply Principal Component Analysis to extract key features.",
+    "Compute the principal components of the dataset.",
+    "Transform the data using PCA for visualization.",
+    "Use scib_metrics.utils.pca to analyze the data.",
+    "Perform PCA to identify variance in the dataset.",
+    "Apply PCA for feature extraction.",
+    "Use PCA to summarize large datasets.",
+    "Principal Component Analysis converts correlated variables into uncorrelated components.",
+    
+    # New one-sentence descriptions of PCA
+    "Principal Component Analysis identifies directions of maximum variance in data.",
+    "PCA transforms a set of possibly correlated variables into linearly uncorrelated components.",
+    "PCA reduces complexity in datasets while retaining most information.",
+    "Principal Component Analysis summarizes large datasets by key features.",
+    "PCA finds the principal axes that capture the most variance in the data.",
+    "Principal Component Analysis is used to simplify data without losing patterns.",
+    "PCA helps visualize high-dimensional data in lower dimensions.",
+    "Principal Component Analysis converts original features into principal components.",
+    "PCA identifies important components that explain variability in the data.",
+    "Principal Component Analysis is a method for dimensionality reduction.",
+    "PCA is used to identify hidden structure in data.",
+    "Principal Component Analysis reduces redundant information in datasets.",
+    "PCA helps detect patterns and correlations in large datasets.",
+    "Principal Component Analysis finds new uncorrelated variables called components.",
+    "PCA preserves variance while compressing the dataset.",
+    "Principal Component Analysis extracts the most informative directions from data.",
+    "PCA is often used as a preprocessing step for machine learning.",
+    "Principal Component Analysis helps to simplify data visualization.",
+    "PCA identifies the axes that capture the most significant data variation.",
+    "Principal Component Analysis converts complex datasets into principal components."
+]
+
+    
     for i in range(len(urls)):
         func = rag.extract_html(urls[i])
-        url = "https://en.wikipedia.org/wiki/Principal_component_analysis"
-        response = requests.get(url)
+        response = requests.get("https://en.wikipedia.org/wiki/Principal_component_analysis")
         soup = BeautifulSoup(response.text, "html.parser")
         content = soup.find("div", {"class": "mw-parser-output"})
-        # Remove unwanted tags: citations, tables, math, images, etc.
+        
+
         for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
             tag.decompose()
+            
         text = content.get_text(separator=" ", strip=True)
         page_sentences = re.split(r'(?<=[.!?]) +', text)
+        
 
         for n in sentence_lengths:
-            sliced_text = " ".join(page_sentences[:n])  # join sentences for embedding/printing
+            sliced_text = " ".join(page_sentences[:n])
             console.print(f"[red][bold]{n} sentences:\n")
             console.print(f"{sliced_text}…")  
             rag.create_embeddings(sliced_text)
+        
+
+        full_text = " ".join(page_sentences)
+        rag.create_embeddings(full_text)
 
     rag.queries += prompts
-    rag.cosine_distance_heatmap(keywords)
+    rag.cosine_distance_heatmap([f"{n} sentences" for n in sentence_lengths])
