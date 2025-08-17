@@ -21,6 +21,7 @@ try:
     import numpy as np
     import sklearn
     import seaborn as sns
+    import wikipedia
     
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
@@ -241,7 +242,7 @@ if __name__ == "__main__":
     keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"]
     prompts = ["SCIB Metrics Principal Component Analysis"]
 
-    wiki_wiki = wikipediaapi.Wikipedia("en")
+    wiki = wikipediaapi.Wikipedia(language="en", user_agent="OlafBot")
 
     for i in range(len(urls)):
         url = urls[i]
@@ -249,9 +250,7 @@ if __name__ == "__main__":
         func = rag.extract_html(url)
         if func and func["description"]:
             search_results = wikipedia.search(search_term)
-            wiki_page = wiki_wiki.page(search_results[0])
-
-            # Get full page text and split into sentences
+            wiki_page = wiki.page(search_results[0])
             full_text = wiki_page.text
             sentences = [s.strip() for s in re.split(r'(?<=[.!?]) +', full_text) if s.strip()]
 
@@ -263,7 +262,7 @@ if __name__ == "__main__":
                     text_variant = " ".join(sentences[:n])  # first n sentences
 
                 console.print(f"[red][bold]{n} sentences:\n")
-                console.print(f"{text_variant[:500]}…")  # preview first 500 chars
+                console.print(f"{text_variant[-500:]}…")  # preview first 500 chars
 
                 func["definition"] += str(n)
                 # rag.add_function(func)
