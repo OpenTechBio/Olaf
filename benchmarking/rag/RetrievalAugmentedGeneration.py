@@ -240,7 +240,8 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     urls = ["https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"]
-    keywords = ["1_sentence", "5_sentences", "10_sentences", "20_sentences", "30_sentences", "full"]
+    sentence_lengths = [1, 5, 10, 15, 20, 25, 30, 40]
+    keywords = [f"{n sentences}" for n in sentence_lengths]
     prompts = ["SCIB Metrics Principal Component Analysis"]
 
     for i in range(len(urls)):
@@ -248,33 +249,28 @@ if __name__ == "__main__":
         search_term = "Principal Component Analysis"
         func = {"definition": ""}  # placeholder for your existing extract_html logic
 
-        # Example: pretend extract_html returned something
-        if True:  # replace with func and description check
+        if func:  
             search_results = wikipedia.search(search_term)
-            wiki_title = search_results[0]
+            text_variant = wikipedia.page(search_results[0]).content
 
-            sentence_lengths = [1, 5, 10, 15, 20, 25, 30, 40, None]
+            # Aggressive regex cleanup
+            text_variant = re.sub(r"\\[a-zA-Z]+{.*?}", "", text_variant)
+            text_variant = re.sub(r"\$.*?\$", "", text_variant)
+            text_variant = re.sub(r"\\\[.*?\\\]", "", text_variant, flags=re.DOTALL)
+            text_variant = re.sub(r"\$\$.*?\$\$", "", text_variant, flags=re.DOTALL)
+            text_variant = re.sub(r"{.*?}", "", text_variant)
+            text_variant = re.sub(r"\([a-zA-Z0-9_ ,.-]*\)", "", text_variant)
+            text_variant = re.sub(r"\s+", " ", text_variant).strip()
+
+            # Split cleaned text into sentences
+            page_sentences = re.split(r'(?<=[.!?]) +', text_variant)
+
             for n in sentence_lengths:
-                if n is None:
-                    text_variant = wikipedia.page(wiki_title).content
-                else:
-                    text_variant = wikipedia.summary(wiki_title, sentences=n)
-
-                # Super aggressive regex cleanup inline
-                text_variant = re.sub(r"\\[a-zA-Z]+{.*?}", "", text_variant)
-                text_variant = re.sub(r"\$.*?\$", "", text_variant)
-                text_variant = re.sub(r"\\\[.*?\\\]", "", text_variant, flags=re.DOTALL)
-                text_variant = re.sub(r"\$\$.*?\$\$", "", text_variant, flags=re.DOTALL)
-                text_variant = re.sub(r"{.*?}", "", text_variant)
-                text_variant = re.sub(r"\([a-zA-Z0-9_ ,.-]*\)", "", text_variant)
-                text_variant = re.sub(r"\s+", " ", text_variant).strip()
-
+                sliced_text = " ".join(page_sentences[:n])  # join sentences for embedding/printing
                 console.print(f"[red][bold]{n} sentences:\n")
-                console.print(f"{text_variant}…")  # preview first 500 chars
-
-                func["definition"] += str(n)
+                console.print(f"{sliced_text}…")  
                 rag.add_function(func)
-                rag.create_embeddings(text_variant)
+                rag.create_embeddings(sliced_text)
 
     rag.queries += prompts
     rag.cosine_distance_heatmap(keywords)
