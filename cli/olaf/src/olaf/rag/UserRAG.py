@@ -29,27 +29,27 @@ class RetrievalAugmentedGeneration():
         self.functions = self.load_functions()
         self.queries = []
 
-    def load_embeddings(self) -> Optional[List[np.ndarray]]:
+    def load_embeddings(self) -> List[np.ndarray]:
         try:
             with open(EMBEDDING_FILE, "r", encoding="utf-8") as f:
                 return [np.array(json.loads(line)) for line in f if line.strip()]
         except FileNotFoundError:
             console.log("[red]Embeddings file not found.")
-            return None
+            return []
         except json.JSONDecodeError:
             console.log("[red]Embeddings file is not valid JSONL.")
-            return None
+            return []
     
-    def load_functions(self) -> Optional[List[str]]:
+    def load_functions(self) -> List[str]:
         try:
             with open(FUNCTIONS_FILE, "r", encoding="utf-8") as f:
                 return [json.loads(line) for line in f if line.strip()]
         except FileNotFoundError:
             console.log("[red]Functions file not found.")
-            return None
+            return []
         except json.JSONDecodeError:
             console.log("[red]Functions file is not valid JSONL.")
-            return None
+            return []
 
     @staticmethod
     def cosine_similarity(A: np.ndarray, B: np.ndarray) -> List[float]:
