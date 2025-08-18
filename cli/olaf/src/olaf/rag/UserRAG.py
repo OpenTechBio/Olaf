@@ -40,7 +40,7 @@ class RetrievalAugmentedGeneration():
             console.log("[red]Embeddings file is not valid JSONL.")
             return []
     
-    def load_functions(self) -> List[str]:
+    def load_functions(self) -> List[Dict[str, str]]:
         try:
             with open(FUNCTIONS_FILE, "r", encoding="utf-8") as f:
                 return [json.loads(line) for line in f if line.strip()]
@@ -58,7 +58,7 @@ class RetrievalAugmentedGeneration():
 
     def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
-            if name in function:
+            if name in function["definition"]:
                 return function
         return None
 
@@ -70,6 +70,6 @@ class RetrievalAugmentedGeneration():
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
-        return self.embeddings[idx]
+        return self.functions[idx]["description"]
         
         

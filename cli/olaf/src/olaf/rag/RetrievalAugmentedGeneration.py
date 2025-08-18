@@ -58,7 +58,7 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Embeddings file is not valid JSONL.")
             return []
     
-    def load_functions(self) -> List[str]:
+    def load_functions(self) -> List[Dict[str, str]]:
         try:
             with open(FUNCTIONS_FILE, "r", encoding="utf-8") as f:
                 return [json.loads(line) for line in f if line.strip()]
