@@ -44,8 +44,8 @@ class RetrievalAugmentedGeneration:
 
     def view_query_history(self) -> None:
         console.log(f"Query history:")
-        for i in range(len(self.queries)):
-            console.log(f"[Query {i}] {self.queries[i]}")
+        for i, q in enumerate(self.queries):
+            console.log(f"[Query {i}] {q}")
 
     def load_embeddings(self) -> List[np.ndarray]:
         try:
@@ -117,8 +117,8 @@ class RetrievalAugmentedGeneration:
             return None 
         try: 
             page_title = wikipedia.search(search_term)[0]
-            wiki_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
-            response = requests.get(wiki_url)
+            url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
+            response = requests.get(url)
             response.raise_for_status()
         except requests.exceptions.Timeout as e:
             console.log(f"[red]Request timed out: URL={url} | Error={e}")
@@ -139,7 +139,7 @@ class RetrievalAugmentedGeneration:
         return embedding_content
 
 
-    def embedding_exists(self, func_name:str) -> Optional[Dict[str, str]]:
+    def embedding_exists(self, func_name:str) -> bool:
         for function in self.functions:
             if func_name in function["definition"]:
                 return True
@@ -153,9 +153,10 @@ class RetrievalAugmentedGeneration:
 
 
     def embedding_pipeline(self, url:str) -> None:
-        func_definition, search_term  = self.extract_html_scib(url)
-        if not func_definition or not search_term:
-            return 
+        result = self.extract_html_scib(url)
+        if not result:
+            return
+        func_definition, search_term = result
         if not self.embedding_exists(func_definition):
             embedding_content = self.extract_wiki_content(search_term)
             if embedding_content:
@@ -166,7 +167,7 @@ class RetrievalAugmentedGeneration:
             
 
     @staticmethod
-    def cosine_similarity(A: np.ndarray, B: np.ndarray) -> List[float]:
+    def cosine_similarity(A: np.ndarray, B: List[np.ndarray]) -> List[float]:
         sims = [np.dot(A, emb) / (np.linalg.norm(A) * np.linalg.norm(emb)) for emb in B]
         return sims
     
@@ -205,7 +206,7 @@ class RetrievalAugmentedGeneration:
                     label="Queries", color="red", marker="x", s=100)
         
         for i, (x, y) in enumerate(umap_embeddings[:len(self.embeddings)]):
-            plt.annotate(self.functions[i], (x, y), textcoords="offset points", xytext=(0, 5),
+            plt.annotate(self.functions[i]["definition"], (x, y), textcoords="offset points", xytext=(0, 5),
                          ha='center', fontsize=8, color='blue')
         
         for i, (x, y) in enumerate(umap_embeddings[len(self.embeddings):]):
