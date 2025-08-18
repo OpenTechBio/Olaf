@@ -42,12 +42,12 @@ class RetrievalAugmentedGeneration:
         self.functions = self.load_functions()
         self.queries = []
 
-    def view_history(self) -> None:
+    def view_query_history(self) -> None:
         console.log(f"Query history:")
         for i in range(len(self.queries)):
             console.log(f"[Query {i}] {self.queries[i]}")
 
-    def load_embeddings(self) -> Optional[List[np.ndarray]]:
+    def load_embeddings(self) -> List[np.ndarray]:
         try:
             with open(EMBEDDING_FILE, "r", encoding="utf-8") as f:
                 return [np.array(json.loads(line)) for line in f if line.strip()]
@@ -58,7 +58,7 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Embeddings file is not valid JSONL.")
             return []
     
-    def load_functions(self) -> Optional[List[Dict[str, str]]]:
+    def load_functions(self) -> Optional[List[str]]:
         try:
             with open(FUNCTIONS_FILE, "r", encoding="utf-8") as f:
                 return [json.loads(line) for line in f if line.strip()]
@@ -69,7 +69,7 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Functions file is not valid JSONL.")
             return []
 
-    def extract_html_scib(self, url: str) -> Optional[Dict[str, str]]:
+    def extract_html_scib(self, url: str) -> Tuple(str, str):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -83,48 +83,42 @@ class RetrievalAugmentedGeneration:
         func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
         return func_def, func_descr 
 
-    def add_function(self, func: Dict[str, str]) -> Optional[Dict[str, str]]:
+    def add_function(self, func: str) -> None:
         try:
             with open(FUNCTIONS_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(func) + "\n")
+            console.print(f"[green]Functions successfully stored in {FUNCTIONS_FILE}")
+            self.functions.append(func)
         except Exception as e:
             console.print(f"[red]Failed to write to FUNCTIONS_FILE")
-            return {}
-        self.functions.append(func)
-        return func
 
-    def create_embeddings(self, text: str) -> None:
+    def add_embedding(self, text: str) -> None:
         embeddings = self.model.encode([text])[0]
         try:
             with open(EMBEDDING_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(embeddings.tolist()) + "\n")
-            self.embeddings.append(embeddings)
             console.print(f"[green]Embeddings successfully stored in {EMBEDDING_FILE}")
+            self.embeddings.append(embeddings)
         except Exception as e:
             console.print(f"[red]Failed to create embeddings: {e}")
 
-    def create_embedding_content(self, url:str):
-        _, search_term  = rag.extract_html(url)
+    def create_embedding_content(self, url:str) -> str:
+        _, search_term  = self.extract_html_scib(url)
         page_title = wikipedia.search(search_term)[0]
         wiki_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
+        
         response = requests.get(wiki_url)
         soup = BeautifulSoup(response.text, "html.parser")
         content = soup.find("div", {"class": "mw-parser-output"})
+        
         for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
             tag.decompose()
+            
         text = content.get_text(separator=" ", strip=True)
         page_sentences = re.split(r'(?<=[.!?]) +', text)
-        for n in sentence_lengths:
-            embedding_content = " ".join(page_sentences[:EMBEDDING_LEN])
+        embedding_content = " ".join(page_sentences[:EMBEDDING_LEN])
         return embedding_content
 
-
-    def find_by_url(self, url: str) -> Optional[Dict[str, str]]:
-        for idx, f in enumerate(self.functions):
-            if f["source"] == url:
-                return f
-        console.print("URL not found")
-        return {}
         
     def retrieve_function(name:str) -> str:
         for function in self.functions:
@@ -149,14 +143,11 @@ class RetrievalAugmentedGeneration:
         idx = np.argmax(sims)
         return self.embeddings[idx]
 
-    def umap_plot(self, keywords: List[str]) -> None:
+    def umap_plot(self) -> None:
         if not self.embeddings or not self.queries:
-            console.log("[yellow]No embeddings or queries to plot.")
+            console.log("[yellow]No embeddings and/or queries to plot.")
             return
         
-        if len(keywords) != len(self.embeddings):
-            console.log("[red]Number of keywords must match number of embeddings![/red]")
-            return
         
         query_embeddings = self.model.encode(self.queries)
         embeddings_array = np.array(self.embeddings)
@@ -177,12 +168,10 @@ class RetrievalAugmentedGeneration:
                     umap_embeddings[len(self.embeddings):, 1],
                     label="Queries", color="red", marker="x", s=100)
         
-        # Annotate embeddings with keywords
         for i, (x, y) in enumerate(umap_embeddings[:len(self.embeddings)]):
-            plt.annotate(keywords[i], (x, y), textcoords="offset points", xytext=(0, 5),
+            plt.annotate(self.functions[i], (x, y), textcoords="offset points", xytext=(0, 5),
                          ha='center', fontsize=8, color='blue')
         
-        # Annotate queries with actual query strings
         for i, (x, y) in enumerate(umap_embeddings[len(self.embeddings):]):
             plt.annotate(self.queries[i], (x, y), textcoords="offset points", xytext=(0, 5),
                          ha='center', fontsize=10, color='red')
