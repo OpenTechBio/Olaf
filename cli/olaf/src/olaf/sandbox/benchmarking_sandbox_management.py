@@ -6,12 +6,9 @@ import sys
 import argparse
 import os
 import time
-import subprocess # Still needed for docker cp (if used elsewhere)
 import shlex
-import json
-import io
-import tempfile # May not be needed anymore
-
+from typing import Dict
+import requests
 # --- Third-Party Imports ---
 try:
     import docker
@@ -259,7 +256,22 @@ class SandboxManager:
                 self.stop_container(remove=True, container_obj=current_container)
             self.container = None
             return False
-
+        
+    def exec_code(self, code: str, timeout: int = 300) -> Dict:
+            """Executes code by sending it to the API inside the container."""
+            api_url = f"http://localhost:{API_PORT_HOST}/execute"
+            try:
+                response = requests.post(
+                    api_url,
+                    json={"code": code, "timeout": timeout},
+                    timeout=timeout + 10
+                )
+                response.raise_for_status()
+                return response.json()
+            except requests.RequestException as e:
+                console.print(f"[bold red]API request to sandbox failed: {e}[/bold red]")
+                return {"status": "error", "stdout": "", "stderr": f"Host-level request error: {e}"}
+            
     def stop_container(self, remove=False, container_obj=None):
         """Stops the container and optionally removes it."""
         # Find the container to stop if not provided

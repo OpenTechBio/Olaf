@@ -46,8 +46,8 @@ except ImportError as e:
     sys.exit(1)
 
 # -- Local imports ---------------------------------------------------------------
-from benchmarking.core.io_helpers import extract_python_code, display, select_dataset, collect_resources, get_initial_prompt, format_execute_response
-from benchmarking.core.sandbox_management import init_docker, init_singularity, init_singularity_exec
+from cli.core.io_helpers import extract_python_code, display, select_dataset, collect_resources, get_initial_prompt, format_execute_response
+from cli.core.sandbox_management import init_docker, init_singularity, init_singularity_exec
 
 
 console = Console()
