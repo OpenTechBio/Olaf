@@ -239,6 +239,7 @@ class RetrievalAugmentedGeneration:
         self.embeddings = []
         self.queries = []
         self.functions = []
+        
 # ──────Implementation──────────────────────────────────────────────────────────
 
 rag = RetrievalAugmentedGeneration()
