@@ -157,7 +157,7 @@ class RetrievalAugmentedGeneration:
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
-        return self.embeddings[idx]
+        return self.functions[idx]
 
     def umap_plot(self) -> None:
         if not self.embeddings or not self.queries:
@@ -244,8 +244,9 @@ class RetrievalAugmentedGeneration:
 rag = RetrievalAugmentedGeneration()
 url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
 func, search_term  = rag.extract_html_scib(url)
-rag.add_embedding(rag.create_embedding_content(search_term)))
-rag.add_function(func)
+if not rag.retrieve_function(func):
+    rag.add_embedding(rag.create_embedding_content(search_term))
+    rag.add_function(func)
 print(rag.query("What is pca"))
 
     
