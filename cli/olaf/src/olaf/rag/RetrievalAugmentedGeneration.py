@@ -58,7 +58,7 @@ class RetrievalAugmentedGeneration:
             console.log("[red]Embeddings file is not valid JSONL.")
             return []
     
-    def load_functions(self) -> Optional[List[str]]:
+    def load_functions(self) -> List[str]:
         try:
             with open(FUNCTIONS_FILE, "r", encoding="utf-8") as f:
                 return [json.loads(line) for line in f if line.strip()]
@@ -111,7 +111,7 @@ class RetrievalAugmentedGeneration:
         func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
         return func_def, func_descr 
 
-    def create_embedding_content(self, serach_term:str) -> Optional[str]:
+    def extract_wiki_content(self, search_term:str) -> Optional[str]:
         if not search_term:
             return None 
         try: 
@@ -143,6 +143,21 @@ class RetrievalAugmentedGeneration:
             if name in function:
                 return function
         return None
+
+
+    def embedding_pipeline(self, url:str) -> None:
+        func_definition, search_term  = self.extract_html_scib(url)
+        if not func_definition or not search_term:
+            return 
+        func = self.retrieve_function(func_definition)
+        if not func:
+            embedding_content = self.extract_wiki_content(search_term)
+            if embedding_content:
+                self.add_embedding(embedding_content)
+                self.add_function(func_definition)
+        else:
+            console.log(f"[yellow] Embedding for url {url} already exists.")
+            
 
     @staticmethod
     def cosine_similarity(A: np.ndarray, B: np.ndarray) -> List[float]:
@@ -245,10 +260,8 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
-    func, search_term  = rag.extract_html_scib(url)
-    if not rag.retrieve_function(func):
-        rag.add_embedding(rag.create_embedding_content(search_term))
-        rag.add_function(func)
+    rag.embedding_pipeline(url)
+    print(type(rag.embeddings))
     print(rag.query("What is pca"))
 
     
