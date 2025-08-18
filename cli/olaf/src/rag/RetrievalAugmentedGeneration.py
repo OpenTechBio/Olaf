@@ -94,10 +94,11 @@ class RetrievalAugmentedGeneration:
             response = requests.get(url)
             response.raise_for_status()
         except requests.exceptions.Timeout as e:
-            console.log(f"[red] Request timed out: str(e)}")
+            console.log(f"[red]Request timed out: URL={url} | Error={e}")
             return None 
         except requests.exceptions.RequestException as e:
-            console.log(f"[red] Request failed: str(e)}")
+            console.log(f"[red] Request failed: URL={url} | Error={e}")
+            return None 
             
         soup = BeautifulSoup(response.text, 'html.parser')
         func_sig = soup.select_one("dt.sig.sig-object.py")
@@ -111,18 +112,19 @@ class RetrievalAugmentedGeneration:
         return func_def, func_descr 
 
     def create_embedding_content(self, url:str) -> Optional[str]:
-        _, search_term  = self.extract_html_scib(url)
-        
+        func, search_term  = self.extract_html_scib(url)
+        if not search_term:
+            return None 
         try: 
             page_title = wikipedia.search(search_term)[0]
             wiki_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
             response = requests.get(wiki_url)
             response.raise_for_status()
         except requests.exceptions.Timeout as e:
-            console.log(f"[red] Request timed out: str(e)}")
+            console.log(f"[red]Request timed out: URL={url} | Error={e}")
             return None
         except requests.exceptions.RequestException as e:
-            console.log(f"[red] Request failed: str(e)}")
+            console.log(f"[red] Request failed: URL={url} | Error={e}")
             return None
         
         soup = BeautifulSoup(response.text, "html.parser")
@@ -238,7 +240,7 @@ class RetrievalAugmentedGeneration:
         self.embeddings = []
         self.queries = []
         self.functions = []
-
+# ──────Implementation──────────────────────────────────────────────────────────
 
     
     
