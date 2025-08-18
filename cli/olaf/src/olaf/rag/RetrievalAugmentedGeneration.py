@@ -138,11 +138,17 @@ class RetrievalAugmentedGeneration:
         
         return embedding_content
 
+
+    def embedding_exists(self, func_name:str) -> Optional[Dict[str, str]]:
+        for function in self.functions:
+            if func_name in function["definition"]:
+                return True
+        return False
         
     def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
             if name in function["definition"]:
-                return function
+                return function["definition"]
         return None
 
 
@@ -150,14 +156,13 @@ class RetrievalAugmentedGeneration:
         func_definition, search_term  = self.extract_html_scib(url)
         if not func_definition or not search_term:
             return 
-        func = self.retrieve_function(func_definition)
-        if not func:
+        if not self.embedding_exists(func_definition):
             embedding_content = self.extract_wiki_content(search_term)
             if embedding_content:
                 self.add_embedding(embedding_content)
                 self.add_function({"definition": func_definition, "description": embedding_content})
         else:
-            console.log(f"[yellow] Embedding for url {url} already exists.")
+            console.log(f"[yellow] Embedding for url {url} exists.")
             
 
     @staticmethod

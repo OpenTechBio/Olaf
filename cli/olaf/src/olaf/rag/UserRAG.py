@@ -21,7 +21,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 EMBEDDING_FILE = SCRIPT_DIR / "embeddings.jsonl"
 FUNCTIONS_FILE = SCRIPT_DIR / "functions.jsonl"
 
-class RetrievalAugmentedGeneration():
+class UserRAG():
     model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
 
     def __init__(self):
@@ -71,5 +71,10 @@ class RetrievalAugmentedGeneration():
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
         return self.functions[idx]["description"]
-        
+
+ # ──────Implementation──────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    rag = UserRAG()
+    print(rag.query("What is pca"))
         
