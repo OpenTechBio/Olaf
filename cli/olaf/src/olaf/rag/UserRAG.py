@@ -52,14 +52,14 @@ class UserRAG():
             return []
 
     @staticmethod
-    def cosine_similarity(A: np.ndarray, B: np.ndarray) -> List[float]:
+    def cosine_similarity(A: np.ndarray, B: List[np.ndarray]) -> List[float]:
         sims = [np.dot(A, emb) / (np.linalg.norm(A) * np.linalg.norm(emb)) for emb in B]
         return sims
 
     def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
             if name in function["definition"]:
-                return function
+                return function["definition"]
         return None
 
     def query(self, text_query: str) -> Optional[np.ndarray]:
