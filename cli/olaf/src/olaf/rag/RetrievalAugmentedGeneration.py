@@ -70,7 +70,7 @@ class RetrievalAugmentedGeneration:
             return []
 
 
-    def add_function(self, func: str) -> None:
+    def add_function(self, func: Dict[str, str]) -> None:
         try:
             with open(FUNCTIONS_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(func) + "\n")
@@ -141,7 +141,7 @@ class RetrievalAugmentedGeneration:
         
     def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
-            if name in function:
+            if name in function["definition"]:
                 return function
         return None
 
@@ -155,7 +155,7 @@ class RetrievalAugmentedGeneration:
             embedding_content = self.extract_wiki_content(search_term)
             if embedding_content:
                 self.add_embedding(embedding_content)
-                self.add_function(func_definition)
+                self.add_function({"definition": func_definition, "description": embedding_content})
         else:
             console.log(f"[yellow] Embedding for url {url} already exists.")
             
@@ -173,7 +173,7 @@ class RetrievalAugmentedGeneration:
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
-        return self.functions[idx]
+        return self.functions[idx]["description"] 
 
     def umap_plot(self) -> None:
         if not self.embeddings or not self.queries:
