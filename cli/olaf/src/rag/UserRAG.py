@@ -58,7 +58,7 @@ class RetrievalAugmentedGeneration():
         sims = [np.dot(A, emb) / (np.linalg.norm(A) * np.linalg.norm(emb)) for emb in B]
         return sims
 
-    def get_function(name:str) -> str:
+    def retrieve_function(name:str) -> str:
         for function in self.functions:
             if name in function:
                 return function
