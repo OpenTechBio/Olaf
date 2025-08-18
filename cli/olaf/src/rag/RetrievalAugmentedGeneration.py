@@ -106,7 +106,7 @@ class RetrievalAugmentedGeneration:
             console.log("[red] No function signature found")
             return None
 
-        func_def = func_sig.get_text(strip=True)
+        func_def = ''.join(func_sig.find_all(text=True, recursive=False)).strip()
         descr_tag = func_sig.find_next_sibling("dd")
         func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
         return func_def, func_descr 
