@@ -106,7 +106,8 @@ class RetrievalAugmentedGeneration:
             console.log("[red] No function signature found")
             return None
 
-        func_def = ''.join(func_sig.find_all(string=True, recursive=False)).strip()
+        func_def = func_sig.get_text(strip=True)
+        func_def = re.sub(r"\s*\[source\]$", "", func_def)
         descr_tag = func_sig.find_next_sibling("dd")
         func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
         return func_def, func_descr 
@@ -260,8 +261,7 @@ class RetrievalAugmentedGeneration:
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
     url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
-    rag.embedding_pipeline(url)
-    print(type(rag.embeddings))
+    rag.embedding_pipeline(url)    
     print(rag.query("What is pca"))
 
     
