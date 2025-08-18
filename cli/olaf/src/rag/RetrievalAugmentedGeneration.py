@@ -103,6 +103,21 @@ class RetrievalAugmentedGeneration:
         except Exception as e:
             console.print(f"[red]Failed to create embeddings: {e}")
 
+    def create_embedding_content(self, url:str):
+        _, search_term  = rag.extract_html(url)
+        page_title = wikipedia.search(search_term)[0]
+        wiki_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
+        response = requests.get(wiki_url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        content = soup.find("div", {"class": "mw-parser-output"})
+        for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
+            tag.decompose()
+        text = content.get_text(separator=" ", strip=True)
+        page_sentences = re.split(r'(?<=[.!?]) +', text)
+        for n in sentence_lengths:
+            embedding_content = " ".join(page_sentences[:EMBEDDING_LEN])
+        return embedding_content
+
 
     def find_by_url(self, url: str) -> Optional[Dict[str, str]]:
         for idx, f in enumerate(self.functions):
@@ -221,19 +236,6 @@ class RetrievalAugmentedGeneration:
         self.functions = []
 
 
-    def create_embedding_content(self, url:str):
-        _, search_term  = rag.extract_html(url)
-        page_title = wikipedia.search(search_term)[0]
-        wiki_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
-        response = requests.get(wiki_url)
-        soup = BeautifulSoup(response.text, "html.parser")
-        content = soup.find("div", {"class": "mw-parser-output"})
-        for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
-            tag.decompose()
-        text = content.get_text(separator=" ", strip=True)
-        page_sentences = re.split(r'(?<=[.!?]) +', text)
-        for n in sentence_lengths:
-            embedding_content = " ".join(page_sentences[:EMBEDDING_LEN])
-        return embedding_content
+    
     
     
