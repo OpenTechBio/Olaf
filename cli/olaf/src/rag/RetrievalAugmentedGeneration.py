@@ -111,8 +111,7 @@ class RetrievalAugmentedGeneration:
         func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
         return func_def, func_descr 
 
-    def create_embedding_content(self, url:str) -> Optional[str]:
-        func, search_term  = self.extract_html_scib(url)
+    def create_embedding_content(self, serach_term:str) -> Optional[str]:
         if not search_term:
             return None 
         try: 
@@ -242,6 +241,12 @@ class RetrievalAugmentedGeneration:
         self.functions = []
 # ──────Implementation──────────────────────────────────────────────────────────
 
-    
+rag = RetrievalAugmentedGeneration()
+url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
+func, search_term  = rag.extract_html_scib(url)
+rag.add_embedding(rag.create_embedding_content(search_term)))
+rag.add_function(func)
+print(rag.query("What is pca"))
+
     
     
