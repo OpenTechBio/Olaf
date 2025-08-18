@@ -20,6 +20,7 @@ try:
     import numpy as np
     import sklearn
     import seaborn as sns
+    import wikipedia 
     
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
@@ -27,6 +28,7 @@ except ImportError as e:
 
 # ── Paths and Constants ─────────────────────────────────────────────
 console = Console()
+EMBEDDING_LEN = 5
 SCRIPT_DIR = Path(__file__).resolve().parent
 EMBEDDING_FILE = SCRIPT_DIR / "embeddings.jsonl"
 FUNCTIONS_FILE = SCRIPT_DIR / "functions.jsonl"
@@ -219,3 +221,19 @@ class RetrievalAugmentedGeneration:
         self.functions = []
 
 
+    def create_embedding_content(self, url:str):
+        _, search_term  = rag.extract_html(url)
+        page_title = wikipedia.search(search_term)[0]
+        wiki_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
+        response = requests.get(wiki_url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        content = soup.find("div", {"class": "mw-parser-output"})
+        for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
+            tag.decompose()
+        text = content.get_text(separator=" ", strip=True)
+        page_sentences = re.split(r'(?<=[.!?]) +', text)
+        for n in sentence_lengths:
+            embedding_content = " ".join(page_sentences[:EMBEDDING_LEN])
+        return embedding_content
+    
+    
