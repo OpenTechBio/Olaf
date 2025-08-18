@@ -5,7 +5,7 @@ from os import path
 from pathlib import Path
 from urllib.request import urlopen
 from urllib.error import URLError
-from typing import List, Dict, Union, Optional
+from typing import List, Tuple, Dict, Union, Optional
 # ── Dependencies ─────────────────────────────────────────────
 try: 
     import requests
@@ -68,8 +68,8 @@ class RetrievalAugmentedGeneration:
         except json.JSONDecodeError:
             console.log("[red]Functions file is not valid JSONL.")
             return []
-
-    def extract_html_scib(self, url: str) -> Tuple(str, str):
+            
+    def extract_html_scib(self, url: str) -> Tuple[str, str]:
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -120,7 +120,7 @@ class RetrievalAugmentedGeneration:
         return embedding_content
 
         
-    def retrieve_function(name:str) -> str:
+    def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
             if name in function:
                 return function
@@ -137,7 +137,7 @@ class RetrievalAugmentedGeneration:
         self.queries.append(text_query)
         if not self.embeddings:
             console.log("[yellow]No embeddings to compare.")
-            return {}
+            return None 
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
@@ -178,8 +178,8 @@ class RetrievalAugmentedGeneration:
         
         plt.legend()
         plt.title("UMAP Projection of Embeddings and Queries")
-        plt.savefig("umap_queries")
-        console.log(f"[green]UMAP plot for all queries saved as {filename}[/green]")
+        plt.savefig("umap_queries.png")
+        console.log(f"[green]UMAP plot for all queries saved as umap_queries.png [/green]")
         plt.close()
         
     def cosine_distance_heatmap(self) -> None:
@@ -215,7 +215,8 @@ class RetrievalAugmentedGeneration:
                     ha="left", va="center", fontsize=8)
 
         plt.savefig("full_cosine_distance_heatmap.png", bbox_inches="tight")
-        console.log(f"[green]Full cosine distance heatmap saved as {filename}[/green]")
+        console.log("[green]Full cosine distance heatmap saved as full_cosine_distance_heatmap.png[/green]")
+
         plt.close()
 
 
