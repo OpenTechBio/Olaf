@@ -246,18 +246,18 @@ if __name__ == "__main__":
     sentence_lengths = [1] + sentence_lengths  
 
     prompts = [
-    "Perform Principal Component Analysis on this dataset.",
-    "Use PCA to reduce the dimensionality of the data.",
-    "Apply Principal Component Analysis to extract key features.",
-    "Compute the principal components of the dataset.",
-    "Transform the data using PCA for visualization.",
-    "Use scib_metrics.utils.pca to analyze the data.",
-    "Perform PCA to identify variance in the dataset.",
-    "Apply PCA for feature extraction.",
-    "Use PCA to summarize large datasets.",
-    "Principal Component Analysis converts correlated variables into uncorrelated components.",
+    # "Perform Principal Component Analysis on this dataset.",
+    # "Use PCA to reduce the dimensionality of the data.",
+    # "Apply Principal Component Analysis to extract key features.",
+    # "Compute the principal components of the dataset.",
+    # "Transform the data using PCA for visualization.",
+    # "Use scib_metrics.utils.pca to analyze the data.",
+    # "Perform PCA to identify variance in the dataset.",
+    # "Apply PCA for feature extraction.",
+    # "Use PCA to summarize large datasets.",
+    # "Principal Component Analysis converts correlated variables into uncorrelated components."
     
-    # New one-sentence descriptions of PCA
+    # # New one-sentence descriptions of PCA
     "Principal Component Analysis identifies directions of maximum variance in data.",
     "PCA transforms a set of possibly correlated variables into linearly uncorrelated components.",
     "PCA reduces complexity in datasets while retaining most information.",
@@ -281,29 +281,26 @@ if __name__ == "__main__":
 ]
 
     
-    for i in range(len(urls)):
-        func = rag.extract_html(urls[i])
-        response = requests.get("https://en.wikipedia.org/wiki/Principal_component_analysis")
-        soup = BeautifulSoup(response.text, "html.parser")
-        content = soup.find("div", {"class": "mw-parser-output"})
+    # for i in range(len(urls)):
+    #     func = rag.extract_html(urls[i])
+    #     response = requests.get("https://en.wikipedia.org/wiki/Principal_component_analysis")
+    #     soup = BeautifulSoup(response.text, "html.parser")
+    #     content = soup.find("div", {"class": "mw-parser-output"})
         
 
-        for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
-            tag.decompose()
+    #     for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
+    #         tag.decompose()
             
-        text = content.get_text(separator=" ", strip=True)
-        page_sentences = re.split(r'(?<=[.!?]) +', text)
+    #     text = content.get_text(separator=" ", strip=True)
+    #     page_sentences = re.split(r'(?<=[.!?]) +', text)
         
 
-        for n in sentence_lengths:
-            sliced_text = " ".join(page_sentences[:n])
-            console.print(f"[red][bold]{n} sentences:\n")
-            console.print(f"{sliced_text}…")  
-            rag.create_embeddings(sliced_text)
+    #     for n in sentence_lengths:
+    #         sliced_text = " ".join(page_sentences[:n])
+    #         console.print(f"[red][bold]{n} sentences:\n")
+    #         console.print(f"{sliced_text}…")  
+    #         rag.create_embeddings(sliced_text)
         
-
-        full_text = " ".join(page_sentences)
-        rag.create_embeddings(full_text)
 
     rag.queries += prompts
     rag.cosine_distance_heatmap([f"{n} sentences" for n in sentence_lengths])
