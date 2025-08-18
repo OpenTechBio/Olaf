@@ -68,20 +68,7 @@ class RetrievalAugmentedGeneration:
         except json.JSONDecodeError:
             console.log("[red]Functions file is not valid JSONL.")
             return []
-            
-    def extract_html_scib(self, url: str) -> Tuple[str, str]:
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
 
-        func_sig = soup.select_one("dt.sig.sig-object.py")
-        if not func_sig:
-            console.log("[red] No function signature found")
-            return {}
-
-        func_def = func_sig.get_text(strip=True)
-        descr_tag = func_sig.find_next_sibling("dd")
-        func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
-        return func_def, func_descr 
 
     def add_function(self, func: str) -> None:
         try:
@@ -102,21 +89,51 @@ class RetrievalAugmentedGeneration:
         except Exception as e:
             console.print(f"[red]Failed to create embeddings: {e}")
 
-    def create_embedding_content(self, url:str) -> str:
+    def extract_html_scib(self, url: str) -> Optional[Tuple[str, str]]:
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+        except requests.exceptions.Timeout as e:
+            console.log(f"[red] Request timed out: str(e)}")
+            return None 
+        except requests.exceptions.RequestException as e:
+            console.log(f"[red] Request failed: str(e)}")
+            
+        soup = BeautifulSoup(response.text, 'html.parser')
+        func_sig = soup.select_one("dt.sig.sig-object.py")
+        if not func_sig:
+            console.log("[red] No function signature found")
+            return None
+
+        func_def = func_sig.get_text(strip=True)
+        descr_tag = func_sig.find_next_sibling("dd")
+        func_descr = descr_tag.p.get_text(strip=True) if descr_tag and descr_tag.p else ""
+        return func_def, func_descr 
+
+    def create_embedding_content(self, url:str) -> Optional[str]:
         _, search_term  = self.extract_html_scib(url)
-        page_title = wikipedia.search(search_term)[0]
-        wiki_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
         
-        response = requests.get(wiki_url)
+        try: 
+            page_title = wikipedia.search(search_term)[0]
+            wiki_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
+            response = requests.get(wiki_url)
+            response.raise_for_status()
+        except requests.exceptions.Timeout as e:
+            console.log(f"[red] Request timed out: str(e)}")
+            return None
+        except requests.exceptions.RequestException as e:
+            console.log(f"[red] Request failed: str(e)}")
+            return None
+        
         soup = BeautifulSoup(response.text, "html.parser")
         content = soup.find("div", {"class": "mw-parser-output"})
-        
         for tag in content.find_all(["table", "sup", "span", "math", "img", "figure", "style", "script"]):
-            tag.decompose()
-            
+            tag.decompose()  
         text = content.get_text(separator=" ", strip=True)
+        
         page_sentences = re.split(r'(?<=[.!?]) +', text)
         embedding_content = " ".join(page_sentences[:EMBEDDING_LEN])
+        
         return embedding_content
 
         
@@ -128,8 +145,6 @@ class RetrievalAugmentedGeneration:
 
     @staticmethod
     def cosine_similarity(A: np.ndarray, B: np.ndarray) -> List[float]:
-        A = np.array(A)
-        B = np.array(B)
         sims = [np.dot(A, emb) / (np.linalg.norm(A) * np.linalg.norm(emb)) for emb in B]
         return sims
     
@@ -147,7 +162,6 @@ class RetrievalAugmentedGeneration:
         if not self.embeddings or not self.queries:
             console.log("[yellow]No embeddings and/or queries to plot.")
             return
-        
         
         query_embeddings = self.model.encode(self.queries)
         embeddings_array = np.array(self.embeddings)
