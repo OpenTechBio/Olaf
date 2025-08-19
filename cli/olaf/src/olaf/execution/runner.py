@@ -193,23 +193,27 @@ def run_agent_session(
             break
         
         history.append({"role": "assistant", "content": msg})
-        display(console, f"assistant ({current_agent.name})", msg)
+        display(console, f"assistant ({current_agent.name})", msg)  
 
+        # --- RAG handling (similar to delegation) ---
+        #Let's say the command is 'query_from_functions_{Function Name}' or 'query_from_embeddings_{Fail Point} that the LLm would generate'
         query_rag = detect_rag(msg)
         if query_rag and query_rag in current_agent.commands:
-            console.print(f"[yellow]🔄 Routing to '{target_agent_name}' via {cmd}[/yellow]")
-            history.append({"role": "assistant", "content": f"🔄 Routing to **{target_agent_name}** (command `{cmd}`)"})
-                current_agent = new_agent
-                system_prompt = (roster_instructions + "\n\n" + current_agent.get_full_prompt(agent_system.global_policy) + "\n\n" + analysis_context)
-                history.insert(0, {"role": "system", "content": system_prompt})
-                # Remove the old system prompt to avoid confusion
-                if len(history) > 1 and history[1].get("role") == "system":
-                    history.pop(1)
+            console.print(f"[yellow]🔍 Triggering RAG query: {query_rag}[/yellow]")
+            rag = RetrievalAugmentedGeneration()
+            if query_rag == "functions":
+                search_term = re.compile(r"query_from_functions_(.+)")
+                retrieved_docs = rag.retrieve_function(search_term) 
+            elif query_rag == "embeddings":
+                search_term = re.compile(r"query_from_embeddings_(.+)")
+                retrieved_docs = rag.query(query_text)
+            rag_cmd_desc = current_agent.commands[query_rag].description 
+            system_prompt = f"{rag_cmd_desc}\n\n{analysis_context}\n\n{retrieved_docs}"
+            history.append({"role": "assistant", "content": system_prompt})
+            display(console, f"system", retrieved_docs)
                 continue
-            
 
         cmd = detect_delegation(msg)
-        #RAG = DETECT_RAG --> IF SO, THEN RAG.QUERY
         if cmd and cmd in current_agent.commands:
             target_agent_name = current_agent.commands[cmd].target_agent
             new_agent = agent_system.get_agent(target_agent_name)
@@ -230,7 +234,6 @@ def run_agent_session(
             last_code_snippet = code
             console.print("[cyan]Executing code in sandbox…[/cyan]")
             exec_result = sandbox_manager.exec_code(code, timeout=300)
-            #PULL OUT ERROR FROM CODE --> QUERY RAG 
             feedback = format_execute_response(exec_result, _OUTPUTS_DIR)
             history.append({"role": "user", "content": feedback})
             display(console, "user", feedback)
