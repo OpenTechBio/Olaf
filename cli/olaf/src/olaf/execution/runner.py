@@ -39,7 +39,8 @@ _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
 _OUTPUTS_DIR = OLAF_HOME / "runs"
 _SNIPPET_DIR = _OUTPUTS_DIR / "snippets"
 _LEDGER_PATH = _OUTPUTS_DIR / f"benchmark_history_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.jsonl"
-_RAG_RE = re.compile(r"query_from_([A-Za-z0-9_]+)")
+_RAG_RE = re.compile(r"query_rag_([A-Za-z0-9_]+)")
+rag = RetrievalAugmentedGeneration()
 
 def _init_paths():
     """Ensure output directories exist before writing."""
@@ -53,9 +54,9 @@ def detect_delegation(msg: str) -> Optional[str]:
     return f"delegate_to_{m.group(1)}" if m else None
 
 def detect_rag(msg: str) -> Optional[str]:
-    """Return the *full* RAG command name (e.g. 'query_from_rag') if present."""
+    """Return the *partial* RAG command if present."""
     m = _RAG_RE.search(msg)
-    return f"query_from_{m.group(1)}" if m else None
+    return f"{m.group(1)}" if m else None
 
 def _dump_code_snippet(run_id: str, code: str) -> str:
     """Write <run_id>.py under outputs/snippets/ and return the relative path."""
@@ -197,16 +198,10 @@ def run_agent_session(
 
         # --- RAG handling (similar to delegation) ---
         #Let's say the command is 'query_from_functions_{Function Name}' or 'query_from_embeddings_{Fail Point} that the LLm would generate'
-        query_rag = detect_rag(msg)
-        if query_rag and query_rag in current_agent.commands:
+        query_from_re = detect_rag(msg)
+        if query_from_re and query_from_re in current_agent.commands:
             console.print(f"[yellow]🔍 Triggering RAG query: {query_rag}[/yellow]")
-            rag = RetrievalAugmentedGeneration()
-            if query_rag == "functions":
-                search_term = re.compile(r"query_from_functions_(.+)")
-                retrieved_docs = rag.retrieve_function(search_term) 
-            elif query_rag == "embeddings":
-                search_term = re.compile(r"query_from_embeddings_(.+)")
-                retrieved_docs = rag.query(query_text)
+            retrieved_docs = rag.query(query_from_re)
             rag_cmd_desc = current_agent.commands[query_rag].description 
             system_prompt = f"{rag_cmd_desc}\n\n{analysis_context}\n\n{retrieved_docs}"
             history.append({"role": "assistant", "content": system_prompt})
@@ -235,8 +230,24 @@ def run_agent_session(
             console.print("[cyan]Executing code in sandbox…[/cyan]")
             exec_result = sandbox_manager.exec_code(code, timeout=300)
             feedback = format_execute_response(exec_result, _OUTPUTS_DIR)
+            error_detected = bool(exec_result.get('stderr')) or not exec_result.get('success', True)
+            if error_detected:
+                stderr = exec_result.get('stderr', '')
+                patterns = [
+                    r"NameError: name '(\w+)' is not defined",                        # undefined function/variable
+                    r"TypeError: .* missing (\d+) required positional argument[s]*: '(\w+)'",  # missing param
+                    r"AttributeError: '.*' object has no attribute '(\w+)'"         # missing attribute
+                ]
+            function_name = "" 
+            for pat in patterns:
+                match = re.search(pat, stderr)
+                if match:
+                    function_name = match.groups()[-1]
+                    break
+            feedback += function_name 
             history.append({"role": "user", "content": feedback})
             display(console, "user", feedback)
+            
 
         if is_auto:
             if benchmark_modules:
