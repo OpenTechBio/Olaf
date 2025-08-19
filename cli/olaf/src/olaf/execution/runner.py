@@ -39,6 +39,7 @@ _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
 _OUTPUTS_DIR = OLAF_HOME / "runs"
 _SNIPPET_DIR = _OUTPUTS_DIR / "snippets"
 _LEDGER_PATH = _OUTPUTS_DIR / f"benchmark_history_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.jsonl"
+_RAG_RE = re.compile(r"query_from_([A-Za-z0-9_]+)")
 
 def _init_paths():
     """Ensure output directories exist before writing."""
@@ -50,6 +51,11 @@ def detect_delegation(msg: str) -> Optional[str]:
     """Return the *full* command name (e.g. 'delegate_to_coder') if present."""
     m = _DELEG_RE.search(msg)
     return f"delegate_to_{m.group(1)}" if m else None
+
+def detect_rag(msg: str) -> Optional[str]:
+    """Return the *full* RAG command name (e.g. 'query_from_rag') if present."""
+    m = _RAG_RE.search(msg)
+    return f"query_from_{m.group(1)}" if m else None
 
 def _dump_code_snippet(run_id: str, code: str) -> str:
     """Write <run_id>.py under outputs/snippets/ and return the relative path."""
@@ -190,6 +196,7 @@ def run_agent_session(
         display(console, f"assistant ({current_agent.name})", msg)
 
         cmd = detect_delegation(msg)
+        #RAG = DETECT_RAG --> IF SO, THEN RAG.QUERY
         if cmd and cmd in current_agent.commands:
             target_agent_name = current_agent.commands[cmd].target_agent
             new_agent = agent_system.get_agent(target_agent_name)
@@ -210,6 +217,7 @@ def run_agent_session(
             last_code_snippet = code
             console.print("[cyan]Executing code in sandbox…[/cyan]")
             exec_result = sandbox_manager.exec_code(code, timeout=300)
+            #PULL OUT ERROR FROM CODE --> QUERY RAG 
             feedback = format_execute_response(exec_result, _OUTPUTS_DIR)
             history.append({"role": "user", "content": feedback})
             display(console, "user", feedback)
