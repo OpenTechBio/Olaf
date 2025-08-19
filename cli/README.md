@@ -35,8 +35,8 @@ Coming soon!
 To install the latest development version, you can clone the repository and install it in editable mode:
 
 ```bash
-git clone https://github.com/OpenTechBio/Ola
-cd olaf
+git clone https://github.com/OpenTechBio/Olaf
+cd olaf/cli/olaf
 pip install -e .
 ```
 
@@ -61,7 +61,6 @@ Your key will be stored securely in a local `.env` file within the OLAF configur
 Next, let's get some data for our agents to analyze. Run the `datasets` command to browse and download a sample dataset from the CZI CELLxGENE Census.
 
 ```bash
-# This will start the interactive dataset browser
 olaf datasets
 ```
 

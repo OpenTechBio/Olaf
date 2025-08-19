@@ -35,8 +35,8 @@ Coming soon!
 To install the latest development version, you can clone the repository and install it in editable mode:
 
 ```bash
-git clone https://github.com/OpenTechBio/Ola
-cd olaf
+git clone https://github.com/OpenTechBio/Olaf
+cd olaf/cli/olaf
 pip install -e .
 ```
 
