@@ -195,6 +195,19 @@ def run_agent_session(
         history.append({"role": "assistant", "content": msg})
         display(console, f"assistant ({current_agent.name})", msg)
 
+        query_rag = detect_rag(msg)
+        if query_rag and query_rag in current_agent.commands:
+            console.print(f"[yellow]🔄 Routing to '{target_agent_name}' via {cmd}[/yellow]")
+            history.append({"role": "assistant", "content": f"🔄 Routing to **{target_agent_name}** (command `{cmd}`)"})
+                current_agent = new_agent
+                system_prompt = (roster_instructions + "\n\n" + current_agent.get_full_prompt(agent_system.global_policy) + "\n\n" + analysis_context)
+                history.insert(0, {"role": "system", "content": system_prompt})
+                # Remove the old system prompt to avoid confusion
+                if len(history) > 1 and history[1].get("role") == "system":
+                    history.pop(1)
+                continue
+            
+
         cmd = detect_delegation(msg)
         #RAG = DETECT_RAG --> IF SO, THEN RAG.QUERY
         if cmd and cmd in current_agent.commands:
