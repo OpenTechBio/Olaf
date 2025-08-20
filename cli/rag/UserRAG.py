@@ -58,8 +58,8 @@ class UserRAG():
 
     def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
-            if name in function["definition"]:
-                return function["definition"]
+            if name in function["signature"]:
+                return function["signature"]
         return None
 
     def query(self, text_query: str) -> Optional[np.ndarray]:

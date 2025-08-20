@@ -141,14 +141,14 @@ class RetrievalAugmentedGeneration:
 
     def embedding_exists(self, func_name:str) -> bool:
         for function in self.functions:
-            if func_name in function["definition"]:
+            if func_name in function["signature"]:
                 return True
         return False
         
     def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
-            if name in function["definition"]:
-                return function["definition"]
+            if name in function["signature"]:
+                return function["signature"]
         return None
 
 
@@ -161,7 +161,7 @@ class RetrievalAugmentedGeneration:
             embedding_content = self.extract_wiki_content(search_term)
             if embedding_content:
                 self.add_embedding(embedding_content)
-                self.add_function({"definition": func_definition, "description": embedding_content})
+                self.add_function({"signature": func_definition, "description": embedding_content})
         else:
             console.log(f"[yellow] Embedding for url {url} exists.")
             
@@ -206,7 +206,7 @@ class RetrievalAugmentedGeneration:
                     label="Queries", color="red", marker="x", s=100)
         
         for i, (x, y) in enumerate(umap_embeddings[:len(self.embeddings)]):
-            plt.annotate(self.functions[i]["definition"], (x, y), textcoords="offset points", xytext=(0, 5),
+            plt.annotate(self.functions[i]["signature"], (x, y), textcoords="offset points", xytext=(0, 5),
                          ha='center', fontsize=8, color='blue')
         
         for i, (x, y) in enumerate(umap_embeddings[len(self.embeddings):]):
