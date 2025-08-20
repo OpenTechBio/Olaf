@@ -17,7 +17,7 @@ try:
     from olaf.config import OLAF_HOME
     from olaf.agents.AgentSystem import Agent, AgentSystem
     from olaf.core.io_helpers import display, extract_python_code, format_execute_response
-    from olaf.cli.rag import RetrievalAugmentedGeneration
+    from olaf.rag.RetrievalAugmentedGeneration import RetrievalAugmentedGeneration
 except ImportError as e:
     print(f"Failed to import a required OLAF module: {e}", file=sys.stderr)
     sys.exit(1)
