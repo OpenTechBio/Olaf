@@ -230,28 +230,34 @@ def run_agent_session(
             console.print("[cyan]Executing code in sandbox…[/cyan]")
             exec_result = sandbox_manager.exec_code(code, timeout=300)
             feedback = format_execute_response(exec_result, _OUTPUTS_DIR)
-            error_detected = bool(exec_result.get('stderr')) or not exec_result.get('success', True)
-            if error_detected:
-                stderr = exec_result.get('stderr', '')
+            history.append({"role": "assistant", "content": feedback})
+            display(console, "assistant", feedback)
+
+            stderr = exec_result.get('stderr', '')
+            if stderr and current_agent.is_rag_enabled:
                 patterns = [
-                    r"NameError: name '(\w+)' is not defined",                        # undefined function/variable
-                    r"TypeError: .* missing (\d+) required positional argument[s]*: '(\w+)'",  # missing param
-                    r"AttributeError: '.*' object has no attribute '(\w+)'"         # missing attribute
+                    r"NameError: name '(\w+)' is not defined",
+                    r"TypeError: .* missing (\d+) required positional argument[s]*: '(\w+)'",
+                    r"AttributeError: '.*' object has no attribute '(\w+)'"
                 ]
-            function_name = "" 
-            for pat in patterns:
-                match = re.search(pat, stderr)
-                if match:
-                    function_name = match.groups()[-1]
-                    break
-            #skip the LLM call, search the database and give it to the LLM 
-            #Result should still show, inject the context to the function that failed AFTER the feedback 
-            feedback += function_name 
-            history.append({"role": "user", "content": feedback})
-            #have 2 diff messages --> 2 diff history appends 
-            #have the name of the function that failed, query from the database, we have the exact function name to get the proper signature and then append with the rag result 
-            display(console, "user", feedback)
+                function_name = ""
+                for pat in patterns:
+                    match = re.search(pat, stderr)
+                    if match:
+                        function_name = match.groups()[-1]
+                        break
             
+                # If we found a missing function/variable, trigger RAG automatically
+                if function_name:
+                    retrieved_docs = rag.retrieve_function(function_name)
+                    console.print(f"[yellow]🔍 Missing function detected: {function_name}, function database search...[/yellow]")
+                if retrieved_docs:
+                    console.print(f"[green] Query successful - Function signature found. [/green]")
+                    feedback += f"\n {function_name} produced an error. The correct function signature for {function_name} is:\n{retrieved_docs}"
+                    history.append({"role": "system", "content": feedback})
+                    display(console, "system", feedback) 
+                else:
+                    console.print(f"Query unsuccessful - Function signature does not exist in the current database.")
 
         if is_auto:
             if benchmark_modules:
