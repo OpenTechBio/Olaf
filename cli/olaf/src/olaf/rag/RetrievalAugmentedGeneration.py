@@ -34,7 +34,7 @@ EMBEDDING_FILE = SCRIPT_DIR / "embeddings.jsonl"
 FUNCTIONS_FILE = SCRIPT_DIR / "functions.jsonl"
 
 # ──────Class──────────────────────────────────────────────────────────
-class RetrievalAugmentedGeneration:
+class RetrievalAugmentedEmbedder:
     model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
 
     def __init__(self) -> None:
