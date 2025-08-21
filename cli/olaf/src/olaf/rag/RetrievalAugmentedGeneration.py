@@ -18,6 +18,7 @@ except ImportError as e:
 
 # ── Paths and Constants ─────────────────────────────────────────────
 console = Console()
+
 RAG_DIR = OLAF_HOME / "rag"
 EMBEDDING_FILE = RAG_DIR / "embeddings.jsonl"
 FUNCTIONS_FILE = RAG_DIR / "functions.jsonl"

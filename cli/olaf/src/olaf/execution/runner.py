@@ -43,6 +43,7 @@ _LEDGER_PATH = _OUTPUTS_DIR / f"benchmark_history_{datetime.utcnow().strftime('%
 _RAG_RE = re.compile(r"query_rag_<([^>]+)>")
 RAG = RetrievalAugmentedGeneration()
 
+
 def _init_paths():
     """Ensure output directories exist before writing."""
     _SNIPPET_DIR.mkdir(exist_ok=True, parents=True)
@@ -77,7 +78,8 @@ def _save_benchmark_record(*, run_id: str, results: dict, meta: dict, code: str 
         record["code_path"] = _dump_code_snippet(run_id, code)
     with _LEDGER_PATH.open("a") as fh:
         fh.write(json.dumps(record) + "\n")
-
+    
+        
 # --- Core Runner Functions ---
 def run_benchmark(
     console: Console,
@@ -200,15 +202,15 @@ def run_agent_session(
         # --- RAG handling ---
         query_from_re = detect_rag(msg)
         if query_from_re and current_agent.is_rag_enabled:
-            console.print(f"[yellow]🔍 Triggering RAG query: {query_rag}[/yellow]")
+            console.print(f"[yellow]🔍 Triggering RAG query: {query_from_re}[/yellow]")
             retrieved_docs = RAG.query(query_from_re)
             if retrieved_docs:
                 console.print(f"[green] RAG query successful. [/green]")
                 feedback = "Replace old usage with this function and retry: " + retrieved_docs
-                history.append({"role": "system", "content": feedback})
-                continue 
+                history.append({"role": "system", "content": feedback}) 
             else:
                 console.print(f"[red] RAG query unsuccessful. [/red]")
+            continue
 
         cmd = detect_delegation(msg)
         if cmd and cmd in current_agent.commands:
@@ -236,20 +238,22 @@ def run_agent_session(
             display(console, "assistant", feedback)
 
             stderr = exec_result.get('stderr', '')
-            if stderr and current_agent.is_rag_enabled:
-                patterns = [
-                    r"NameError: name '(\w+)' is not defined",
-                    r"TypeError: .* missing (\d+) required positional argument[s]*: '(\w+)'",
-                    r"AttributeError: '.*' object has no attribute '(\w+)'"
+            if stderr and curr_agent.is_rag_enabled:
+                func_error_patterns = [
+                    r"missing \d+ required positional argument",  # TypeError: missing argument
+                    r"NameError: name '(\w+)' is not defined",    # NameError
+                    r"AttributeError: '.*' object has no attribute '(\w+)'",  # missing attribute
+                    r"got an unexpected keyword argument"         # wrong keyword argument
                 ]
                 function_name = ""
-                for pat in patterns:
-                    match = re.search(pat, stderr)
-                    if match:
-                        function_name = match.groups()[-1]
-                        break
+                if any(re.search(pat, stderr) for pat in func_error_patterns):
+                    lines = stderr.strip().splitlines()
+                    if len(lines) >= 2:
+                        code_line = lines[-2].strip()  # second-to-last line: code that failed
+                        match = re.search(r'(\w+)\s*\(', code_line)
+                        if match:
+                            function_name = match.group(1)
             
-                # If we found a missing function/variable, trigger RAG automatically
                 if function_name:
                     retrieved_docs = RAG.retrieve_function(function_name)
                     console.print(f"[yellow]🔍 Missing function detected: {function_name}, function database search...[/yellow]")
@@ -257,9 +261,9 @@ def run_agent_session(
                     console.print(f"[green] Query successful - Function signature found. [/green]")
                     feedback += f"\n {function_name} produced an error. The correct function signature for {function_name} is:\n{retrieved_docs}"
                     history.append({"role": "system", "content": feedback})
-                    display(console, "system", feedback) 
                 else:
-                    console.print(f"Query unsuccessful - Function signature does not exist in the current database.")
+                    print(f"Query unsuccessful - Function signature does not exist in the current database.")
+        continue 
 
         if is_auto:
             if benchmark_modules:
