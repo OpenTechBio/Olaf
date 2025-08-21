@@ -10,6 +10,7 @@ try:
     from rich.console import Console
     import matplotlib.pyplot as plt
     import numpy as np
+    from olaf.config import OLAF_HOME
     
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
@@ -17,9 +18,9 @@ except ImportError as e:
 
 # ── Paths and Constants ─────────────────────────────────────────────
 console = Console()
-SCRIPT_DIR = Path(__file__).resolve().parent
-EMBEDDING_FILE = SCRIPT_DIR / "embeddings.jsonl"
-FUNCTIONS_FILE = SCRIPT_DIR / "functions.jsonl"
+RAG_DIR = Path(__file__).parent 
+EMBEDDING_FILE = RAG_DIR / "embeddings.jsonl"
+FUNCTIONS_FILE = RAG_DIR / "functions.jsonl"
 
 class RetrievalAugmentedGeneration():
     model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
@@ -75,5 +76,6 @@ class RetrievalAugmentedGeneration():
  # ──────Implementation──────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    print(RAG_DIR)
     rag = RetrievalAugmentedGeneration()
     print(rag.query("What is pca"))
