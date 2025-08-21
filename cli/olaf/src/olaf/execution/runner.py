@@ -263,7 +263,7 @@ def run_agent_session(
                     history.append({"role": "system", "content": feedback})
                 else:
                     print(f"Query unsuccessful - Function signature does not exist in the current database.")
-        continue 
+            continue 
 
         if is_auto:
             if benchmark_modules:
