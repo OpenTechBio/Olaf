@@ -41,7 +41,7 @@ _OUTPUTS_DIR = OLAF_HOME / "runs"
 _SNIPPET_DIR = _OUTPUTS_DIR / "snippets"
 _LEDGER_PATH = _OUTPUTS_DIR / f"benchmark_history_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.jsonl"
 _RAG_RE = re.compile(r"query_rag_<([^>]+)>")
-rag = RetrievalAugmentedGeneration()
+RAG = RetrievalAugmentedGeneration()
 
 def _init_paths():
     """Ensure output directories exist before writing."""
@@ -201,7 +201,7 @@ def run_agent_session(
         query_from_re = detect_rag(msg)
         if query_from_re and current_agent.is_rag_enabled:
             console.print(f"[yellow]🔍 Triggering RAG query: {query_rag}[/yellow]")
-            retrieved_docs = rag.query(query_from_re)
+            retrieved_docs = RAG.query(query_from_re)
             if retrieved_docs:
                 console.print(f"[green] RAG query successful. [/green]")
                 feedback = "Replace old usage with this function and retry: " + retrieved_docs
@@ -251,7 +251,7 @@ def run_agent_session(
             
                 # If we found a missing function/variable, trigger RAG automatically
                 if function_name:
-                    retrieved_docs = rag.retrieve_function(function_name)
+                    retrieved_docs = RAG.retrieve_function(function_name)
                     console.print(f"[yellow]🔍 Missing function detected: {function_name}, function database search...[/yellow]")
                 if retrieved_docs:
                     console.print(f"[green] Query successful - Function signature found. [/green]")
