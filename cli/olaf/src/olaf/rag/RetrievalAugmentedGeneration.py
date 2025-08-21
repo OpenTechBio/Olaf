@@ -18,7 +18,7 @@ except ImportError as e:
 
 # ── Paths and Constants ─────────────────────────────────────────────
 console = Console()
-RAG_DIR = Path(__file__).parent 
+RAG_DIR = OLAF_HOME / "rag"
 EMBEDDING_FILE = RAG_DIR / "embeddings.jsonl"
 FUNCTIONS_FILE = RAG_DIR / "functions.jsonl"
 
@@ -76,6 +76,5 @@ class RetrievalAugmentedGeneration():
  # ──────Implementation──────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print(RAG_DIR)
     rag = RetrievalAugmentedGeneration()
     print(rag.query("What is pca"))
