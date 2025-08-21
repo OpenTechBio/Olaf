@@ -238,7 +238,7 @@ def run_agent_session(
             display(console, "assistant", feedback)
 
             stderr = exec_result.get('stderr', '')
-            if stderr and curr_agent.is_rag_enabled:
+            if stderr and current_agent.is_rag_enabled:
                 func_error_patterns = [
                     r"missing \d+ required positional argument",  # TypeError: missing argument
                     r"NameError: name '(\w+)' is not defined",    # NameError
@@ -246,6 +246,7 @@ def run_agent_session(
                     r"got an unexpected keyword argument"         # wrong keyword argument
                 ]
                 function_name = ""
+                retrieved_docs = ""
                 if any(re.search(pat, stderr) for pat in func_error_patterns):
                     lines = stderr.strip().splitlines()
                     if len(lines) >= 2:
