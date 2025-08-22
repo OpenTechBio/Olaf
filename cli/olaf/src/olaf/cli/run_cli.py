@@ -23,7 +23,9 @@ PACKAGE_AGENTS_DIR = PACKAGE_ROOT / "agents"
 PACKAGE_DATASETS_DIR = PACKAGE_ROOT / "datasets"
 PACKAGE_AUTO_METRICS_DIR = PACKAGE_ROOT / "auto_metrics"
 
+# Define static in-container paths for primary and reference datasets
 SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
+SANDBOX_REF_DATA_PATH = "/workspace/reference.h5ad"
 
 
 def _prompt_for_file(
@@ -103,6 +105,7 @@ class AppContext:
         self.llm_client: object | None = None
         self.initial_history: List[dict] | None = None
         self.dataset_path: Path | None = None
+        self.reference_dataset_path: Optional[Path] = None
         self.resources: List[Tuple[Path, str]] = []
         self.sandbox_details: dict = {}
 
@@ -111,7 +114,8 @@ def main_run_callback(
     ctx: typer.Context,
     blueprint: Path = typer.Option(None, "--blueprint", "-bp", help="Path to the agent system JSON blueprint.", readable=True),
     driver_agent: str = typer.Option(None, "--driver-agent", "-d", help="Name of the agent to start with."),
-    dataset: Path = typer.Option(None, "--dataset", "-ds", help="Path to the dataset file (.h5ad).", readable=True),
+    dataset: Path = typer.Option(None, "--dataset", "-ds", help="Path to the primary dataset file (.h5ad).", readable=True),
+    reference_dataset: Path = typer.Option(None, "--reference-dataset", "-ref", help="Path to an optional reference dataset file (.h5ad).", readable=True),
     resources_dir: Path = typer.Option(None, "--resources", help="Path to a directory of resource files to mount.", exists=True, file_okay=False),
     llm_backend: str = typer.Option(None, "--llm", help="LLM backend to use: 'chatgpt' or 'ollama'."),
     ollama_host: str = typer.Option("http://localhost:11434", "--ollama-host", help="Base URL for Ollama backend."),
@@ -135,8 +139,13 @@ def main_run_callback(
     app_context.roster_instructions = app_context.agent_system.get_instructions()
     
     if dataset is None:
-        dataset = _prompt_for_file(console, get_datasets_dir(), PACKAGE_DATASETS_DIR, ".h5ad", "Dataset")
+        dataset = _prompt_for_file(console, get_datasets_dir(), PACKAGE_DATASETS_DIR, ".h5ad", "Primary Dataset")
     app_context.dataset_path = dataset
+
+    if reference_dataset is None:
+        if Prompt.ask("Do you want to add a reference dataset?", choices=["y", "n"], default="n").lower() == 'y':
+            reference_dataset = _prompt_for_file(console, get_datasets_dir(), PACKAGE_DATASETS_DIR, ".h5ad", "Reference Dataset")
+    app_context.reference_dataset_path = reference_dataset
 
     if sandbox is None:
         sandbox = Prompt.ask("Choose a sandbox backend", choices=["docker", "singularity"], default="docker")
@@ -148,12 +157,10 @@ def main_run_callback(
     if sandbox == "docker":
         manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_docker(script_dir, subprocess, console, force_refresh=force_refresh)
     elif sandbox == "singularity":
-        # This now correctly maps to the 'singularity-exec' implementation
         manager_class, handle, copy_cmd, exec_endpoint, status_endpoint = init_singularity_exec(script_dir, SANDBOX_DATA_PATH, subprocess, console, force_refresh=force_refresh)
     else:
         raise typer.BadParameter(f"Unknown sandbox type '{sandbox}'. Supported: 'docker', 'singularity'.")
     app_context.sandbox_manager = manager_class()
-    # This check now correctly identifies the exec-style singularity backend
     app_context.sandbox_details = {"handle": handle, "copy_cmd": copy_cmd, "is_exec_mode": sandbox == "singularity"}
 
     if llm_backend is None:
@@ -172,8 +179,14 @@ def main_run_callback(
         raise typer.BadParameter(f"Unknown LLM backend '{llm_backend}'.")
 
     app_context.resources = collect_resources(console, resources_dir) if resources_dir else []
-    
-    app_context.analysis_context = textwrap.dedent(f"Dataset path: **{SANDBOX_DATA_PATH}**\n...")
+    if app_context.reference_dataset_path:
+        app_context.resources.append((app_context.reference_dataset_path, SANDBOX_REF_DATA_PATH))
+
+    # Build the analysis context string, including the reference dataset if it exists
+    analysis_context_str = f"Primary dataset path: **{SANDBOX_DATA_PATH}**\n"
+    if app_context.reference_dataset_path:
+        analysis_context_str += f"Reference dataset path: **{SANDBOX_REF_DATA_PATH}**\n"
+    app_context.analysis_context = textwrap.dedent(analysis_context_str)
     
     driver = app_context.agent_system.get_agent(driver_agent)
     system_prompt = (app_context.roster_instructions + "\n\n" + driver.get_full_prompt(app_context.agent_system.global_policy) + "\n\n" + app_context.analysis_context)
@@ -189,15 +202,18 @@ def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, ma
     details = context.sandbox_details
     dataset_path = cast(Path, context.dataset_path)
     if details["is_exec_mode"] and hasattr(sandbox_manager, "set_data"):
-        sandbox_manager.set_data(dataset_path, context.resources)
-
+        # Pass all resources, including the reference dataset, for bind mounting
+        all_resources = [(dataset_path, SANDBOX_DATA_PATH)] + context.resources
+        sandbox_manager.set_data(all_resources)
     if not sandbox_manager.start_container():
         console.print("[bold red]Failed to start sandbox container.[/bold red]")
         raise typer.Exit(1)
     
     try:
         if not details["is_exec_mode"]:
+            # Copy primary dataset
             details["copy_cmd"](str(dataset_path), f"{details['handle']}:{SANDBOX_DATA_PATH}")
+            # Copy all other resources, including the reference dataset
             for hp, cp in context.resources:
                 details["copy_cmd"](str(hp), f"{details['handle']}:{cp}")
 
