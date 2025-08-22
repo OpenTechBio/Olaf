@@ -10,7 +10,6 @@ try:
     from rich.console import Console
     import matplotlib.pyplot as plt
     import numpy as np
-    from olaf.config import OLAF_HOME
     
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
@@ -19,7 +18,7 @@ except ImportError as e:
 # ── Paths and Constants ─────────────────────────────────────────────
 console = Console()
 
-RAG_DIR = OLAF_HOME / "rag"
+RAG_DIR = Path(__file__).resolve().parent.parent / "rag"
 EMBEDDING_FILE = RAG_DIR / "embeddings.jsonl"
 FUNCTIONS_FILE = RAG_DIR / "functions.jsonl"
 
