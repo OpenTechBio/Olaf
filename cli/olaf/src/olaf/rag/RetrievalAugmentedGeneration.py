@@ -1,8 +1,12 @@
-import uuid
 import json
 import sys
 from pathlib import Path
-from typing import List, Dict, Union, Optional
+from typing import List, Dict, Optional
+from contextlib import redirect_stdout, redirect_stderr
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 # ── Dependencies ─────────────────────────────────────────────
 try: 
     import re 
@@ -71,7 +75,7 @@ class RetrievalAugmentedGeneration():
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
-        return self.functions[idx]["description"]
+        return self.functions[idx]["definition"]
 
  # ──────Implementation──────────────────────────────────────────────────────────
 
