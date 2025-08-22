@@ -266,7 +266,7 @@ def run_agent_session(
                     history.append({"role": "system", "content": feedback})
                     continue
                 else:
-                    print(f"Query unsuccessful - Function signature does not exist in the current database.")
+                    print(f"RAG Error Query unsuccessful - Function signature does not exist in the current database.")
              
 
         if is_auto:

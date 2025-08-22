@@ -5,7 +5,7 @@ from typing import List, Dict, Optional
 from contextlib import redirect_stdout, redirect_stderr
 
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 # ── Dependencies ─────────────────────────────────────────────
 try: 
