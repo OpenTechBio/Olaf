@@ -58,13 +58,12 @@ def init_singularity_exec(script_dir: str, sanbox_data_path, subprocess, console
             self._binds: List[str] = []
             self._proc = None
 
-        def set_data(self, dataset: Path, resources: List[Tuple[Path, str]]):
-            self._binds = [
-                "--bind",
-                f"{dataset.resolve()}:{sanbox_data_path}",
-            ]
-            for host, cont in resources:
-                self._binds.extend(["--bind", f"{host.resolve()}:{cont}"])
+        def set_data(self, all_resources: List[Tuple[Path, str]]):
+                    """Configures all necessary bind mounts from a single list."""
+                    binds = []
+                    for host_path, container_path in all_resources:
+                        binds.extend(["--bind", f"{host_path.resolve()}:{container_path}"])
+                    self._binds = binds
 
         # ------------------------------------------------------------------
         # Container lifecycle
