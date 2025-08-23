@@ -1,8 +1,12 @@
-import uuid
 import json
 import sys
 from pathlib import Path
-from typing import List, Dict, Union, Optional
+from typing import List, Dict, Optional
+from contextlib import redirect_stdout, redirect_stderr
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 # ── Dependencies ─────────────────────────────────────────────
 try: 
     import re 
@@ -10,7 +14,6 @@ try:
     from rich.console import Console
     import matplotlib.pyplot as plt
     import numpy as np
-    from olaf.config import OLAF_HOME
     
 except ImportError as e:
     print(f"Missing dependency: {e}", file=sys.stderr)
@@ -19,7 +22,7 @@ except ImportError as e:
 # ── Paths and Constants ─────────────────────────────────────────────
 console = Console()
 
-RAG_DIR = OLAF_HOME / "rag"
+RAG_DIR = Path(__file__).resolve().parent.parent / "rag"
 EMBEDDING_FILE = RAG_DIR / "embeddings.jsonl"
 FUNCTIONS_FILE = RAG_DIR / "functions.jsonl"
 
@@ -72,7 +75,7 @@ class RetrievalAugmentedGeneration():
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
-        return self.functions[idx]["description"]
+        return self.functions[idx]["definition"]
 
  # ──────Implementation──────────────────────────────────────────────────────────
 

@@ -206,11 +206,12 @@ def run_agent_session(
             retrieved_docs = RAG.query(query_from_re)
             if retrieved_docs:
                 console.print(f"[green] RAG query successful. [/green]")
-                feedback = "Replace old usage with this function and retry: " + retrieved_docs
+                feedback = retrieved_docs
+                console.print(feedback)
                 history.append({"role": "system", "content": feedback}) 
             else:
                 console.print(f"[red] RAG query unsuccessful. [/red]")
-            continue
+            
 
         cmd = detect_delegation(msg)
         if cmd and cmd in current_agent.commands:
@@ -261,10 +262,12 @@ def run_agent_session(
                 if retrieved_docs:
                     console.print(f"[green] Query successful - Function signature found. [/green]")
                     feedback += f"\n {function_name} produced an error. The correct function signature for {function_name} is:\n{retrieved_docs}"
+                    console.print(feedback)
                     history.append({"role": "system", "content": feedback})
+                    continue
                 else:
-                    print(f"Query unsuccessful - Function signature does not exist in the current database.")
-            continue 
+                    print(f"RAG Error Query unsuccessful - Function signature does not exist in the current database.")
+             
 
         if is_auto:
             if benchmark_modules:
