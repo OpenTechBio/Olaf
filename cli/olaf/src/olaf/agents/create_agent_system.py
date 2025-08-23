@@ -2,11 +2,11 @@ import json
 import os
 from typing import Dict, Any
 from pathlib import Path
-from platformdirs import PlatformDirs   # pip install platformdirs
+from platformdirs import PlatformDirs
 import tempfile
 
 APP_NAME   = "olaf"
-APP_AUTHOR = "OpenTechBio"   # or your org
+APP_AUTHOR = "OpenTechBio"
 dirs = PlatformDirs(APP_NAME, APP_AUTHOR)
 
 # Root for user-specific OLAF files. Precedence: env -> platformdirs.
@@ -72,9 +72,24 @@ def define_agents() -> Dict[str, Dict[str, Any]]:
         if agent_name in agents:
             print(f"{Colors.FAIL}Agent '{agent_name}' already exists. Please use a unique name.{Colors.ENDC}")
             continue
+        
         prompt = input(f"{Colors.WARNING}Enter the system prompt for '{Colors.OKCYAN}{agent_name}{Colors.WARNING}': {Colors.ENDC}").strip()
-        agents[agent_name] = {"prompt": prompt, "neighbors": {}, "code_samples": []}
-        print(f"{Colors.OKGREEN}Agent '{Colors.OKCYAN}{agent_name}{Colors.OKGREEN}' added successfully.{Colors.ENDC}")
+        
+        # --- New RAG Configuration Section ---
+        rag_enabled_input = input(f"{Colors.WARNING}Enable Retrieval-Augmented Generation (RAG) for '{Colors.OKCYAN}{agent_name}{Colors.WARNING}'? (y/n): {Colors.ENDC}").strip().lower()
+        is_rag_enabled = rag_enabled_input == 'y'
+        
+        # Add the new 'rag' key to the agent's data structure
+        agents[agent_name] = {
+            "prompt": prompt,
+            "neighbors": {},
+            "code_samples": [],
+            "rag": {"enabled": is_rag_enabled}
+        }
+        
+        rag_status = f"{Colors.OKGREEN}enabled" if is_rag_enabled else f"{Colors.FAIL}disabled"
+        print(f"{Colors.OKGREEN}Agent '{Colors.OKCYAN}{agent_name}{Colors.OKGREEN}' added successfully (RAG: {rag_status}{Colors.OKGREEN}).{Colors.ENDC}")
+
     print(f"\n{Colors.OKBLUE}--- All Agents Defined ---{Colors.ENDC}")
     for name in agents:
         print(f"- {Colors.OKCYAN}{name}{Colors.ENDC}")
@@ -162,7 +177,7 @@ def _atomic_write_json(obj: Any, path: Path) -> None:
     with tempfile.NamedTemporaryFile("w", delete=False, dir=str(path.parent), prefix=path.stem, suffix=".tmp") as tmp:
         json.dump(obj, tmp, indent=2)
         tmp_path = Path(tmp.name)
-    tmp_path.replace(path)  # atomic on POSIX; safe on Windows
+    tmp_path.replace(path)
 
 def save_configuration(global_policy: str, agents_config: Dict[str, Any], output_dir: str) -> None:
     if not agents_config:

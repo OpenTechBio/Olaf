@@ -12,7 +12,6 @@ USER_CODE_SAMPLES_DIR.mkdir(exist_ok=True) # Ensure it exists
 # 2. The package-internal directory (for default samples), found relative to this file
 PACKAGE_CODE_SAMPLES_DIR = Path(__file__).resolve().parent.parent / "code_samples"
 
-
 class Command:
     """Represents a command an agent can issue to a neighboring agent."""
     def __init__(self, name: str, target_agent: str, description: str):
@@ -23,19 +22,18 @@ class Command:
     def __repr__(self) -> str:
         return (f"Command(name='{self.name}', target='{self.target_agent}', "
                 f"desc='{self.description[:30]}...')")
-
-
 class Agent:
     """Represents a single agent in the system."""
-    def __init__(self, name: str, prompt: str, commands: Dict[str, Command], code_samples: Dict[str, str]):
+    def __init__(self, name: str, prompt: str, commands: Dict[str, Command], code_samples: Dict[str, str], is_rag_enabled: bool = False):
         self.name = name
         self.prompt = prompt
         self.commands = commands
         self.code_samples = code_samples
+        self.is_rag_enabled = is_rag_enabled
 
     def __repr__(self) -> str:
         sample_keys = list(self.code_samples.keys())
-        return f"Agent(name='{self.name}', commands={list(self.commands.keys())}, samples={sample_keys})"
+        return f"Agent(name='{self.name}', commands={list(self.commands.keys())}, samples={sample_keys}, rag_enabled={self.is_rag_enabled})"
 
     def get_full_prompt(self, global_policy=None) -> str:
         """Constructs the full prompt including the global policy and command descriptions."""
@@ -53,8 +51,14 @@ class Agent:
                 full_prompt += f"\n  - Target Agent: {command.target_agent}"
             full_prompt += "\n\n**YOU MUST USE THESE EXACT COMMANDS TO DELEGATE TASKS. NO OTHER FORMATTING OR COMMANDS ARE ALLOWED.**"
         
+        if self.is_rag_enabled:
+            full_prompt += "\n\nYou can query your specialized knowledge base for more context with the following command:"
+            full_prompt += f"\n- Command: `query_rag_<function>`"
+            full_prompt += f"\n  - Description: Retrieves relevant information about a specific <function> from your knowledge base. Replace <function> with a concise, descriptive search query (e.g., function names, task you are trying to complete)."
+            full_prompt += f"\n  - Example: `query_rag_<scvi model setup>`"
+            
         if self.code_samples:
-            full_prompt += "\n  - Code Samples Available:"
+            full_prompt += "\n\n  - Code Samples Available:"
             for sample_name in self.code_samples.keys():
                 full_prompt += f"\n    - `{sample_name}`"
   
@@ -101,7 +105,6 @@ class AgentSystem:
                     user_path = USER_CODE_SAMPLES_DIR / filename
                     package_path = PACKAGE_CODE_SAMPLES_DIR / filename
                     
-                    # Default to package path, but overwrite if user path exists
                     path_to_load = None
                     source_label = ""
                     if user_path.exists():
@@ -120,11 +123,15 @@ class AgentSystem:
                     else:
                         print(f"    ❌ WARNING: Code sample file '{filename}' not found in any location.")
 
+            rag_config = agent_data.get("rag", {})
+            is_rag_enabled = rag_config.get("enabled", False)
+
             agent = Agent(
                 name=agent_name,
                 prompt=agent_data['prompt'],
                 commands=commands,
-                code_samples=loaded_samples
+                code_samples=loaded_samples,
+                is_rag_enabled=is_rag_enabled
             )
             agents[agent_name] = agent
         

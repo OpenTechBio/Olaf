@@ -17,6 +17,7 @@ try:
     from olaf.config import OLAF_HOME
     from olaf.agents.AgentSystem import Agent, AgentSystem
     from olaf.core.io_helpers import display, extract_python_code, format_execute_response
+    from olaf.rag.RetrievalAugmentedGeneration import RetrievalAugmentedGeneration
 except ImportError as e:
     print(f"Failed to import a required OLAF module: {e}", file=sys.stderr)
     sys.exit(1)
@@ -39,6 +40,9 @@ _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
 _OUTPUTS_DIR = OLAF_HOME / "runs"
 _SNIPPET_DIR = _OUTPUTS_DIR / "snippets"
 _LEDGER_PATH = _OUTPUTS_DIR / f"benchmark_history_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.jsonl"
+_RAG_RE = re.compile(r"query_rag_<([^>]+)>")
+RAG = RetrievalAugmentedGeneration()
+
 
 def _init_paths():
     """Ensure output directories exist before writing."""
@@ -50,6 +54,11 @@ def detect_delegation(msg: str) -> Optional[str]:
     """Return the *full* command name (e.g. 'delegate_to_coder') if present."""
     m = _DELEG_RE.search(msg)
     return f"delegate_to_{m.group(1)}" if m else None
+
+def detect_rag(msg: str) -> Optional[str]:
+    """Return the *partial* RAG command if present."""
+    m = _RAG_RE.search(msg)
+    return f"{m.group(1)}" if m else None
 
 def _dump_code_snippet(run_id: str, code: str) -> str:
     """Write <run_id>.py under outputs/snippets/ and return the relative path."""
@@ -69,7 +78,8 @@ def _save_benchmark_record(*, run_id: str, results: dict, meta: dict, code: str 
         record["code_path"] = _dump_code_snippet(run_id, code)
     with _LEDGER_PATH.open("a") as fh:
         fh.write(json.dumps(record) + "\n")
-
+    
+        
 # --- Core Runner Functions ---
 def run_benchmark(
     console: Console,
@@ -187,7 +197,21 @@ def run_agent_session(
             break
         
         history.append({"role": "assistant", "content": msg})
-        display(console, f"assistant ({current_agent.name})", msg)
+        display(console, f"assistant ({current_agent.name})", msg)  
+
+        # --- RAG handling ---
+        query_from_re = detect_rag(msg)
+        if query_from_re and current_agent.is_rag_enabled:
+            console.print(f"[yellow]🔍 Triggering RAG query: {query_from_re}[/yellow]")
+            retrieved_docs = RAG.query(query_from_re)
+            if retrieved_docs:
+                console.print(f"[green] RAG query successful. [/green]")
+                feedback = retrieved_docs
+                console.print(feedback)
+                history.append({"role": "system", "content": feedback}) 
+            else:
+                console.print(f"[red] RAG query unsuccessful. [/red]")
+            
 
         cmd = detect_delegation(msg)
         if cmd and cmd in current_agent.commands:
@@ -211,8 +235,39 @@ def run_agent_session(
             console.print("[cyan]Executing code in sandbox…[/cyan]")
             exec_result = sandbox_manager.exec_code(code, timeout=300)
             feedback = format_execute_response(exec_result, _OUTPUTS_DIR)
-            history.append({"role": "user", "content": feedback})
-            display(console, "user", feedback)
+            history.append({"role": "assistant", "content": feedback})
+            display(console, "assistant", feedback)
+
+            stderr = exec_result.get('stderr', '')
+            if stderr and current_agent.is_rag_enabled:
+                func_error_patterns = [
+                    r"missing \d+ required positional argument",  # TypeError: missing argument
+                    r"NameError: name '(\w+)' is not defined",    # NameError
+                    r"AttributeError: '.*' object has no attribute '(\w+)'",  # missing attribute
+                    r"got an unexpected keyword argument"         # wrong keyword argument
+                ]
+                function_name = ""
+                retrieved_docs = ""
+                if any(re.search(pat, stderr) for pat in func_error_patterns):
+                    lines = stderr.strip().splitlines()
+                    if len(lines) >= 2:
+                        code_line = lines[-2].strip()  # second-to-last line: code that failed
+                        match = re.search(r'(\w+)\s*\(', code_line)
+                        if match:
+                            function_name = match.group(1)
+            
+                if function_name:
+                    retrieved_docs = RAG.retrieve_function(function_name)
+                    console.print(f"[yellow]🔍 Missing function detected: {function_name}, function database search...[/yellow]")
+                if retrieved_docs:
+                    console.print(f"[green] Query successful - Function signature found. [/green]")
+                    feedback += f"\n {function_name} produced an error. The correct function signature for {function_name} is:\n{retrieved_docs}"
+                    console.print(feedback)
+                    history.append({"role": "system", "content": feedback})
+                    continue
+                else:
+                    print(f"RAG Error Query unsuccessful - Function signature does not exist in the current database.")
+             
 
         if is_auto:
             if benchmark_modules:

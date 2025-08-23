@@ -7,3 +7,4 @@ dotenv
 openai
 jupyter_client
 nbformat
+sentence_transformers
