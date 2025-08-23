@@ -89,7 +89,7 @@ class RetrievalAugmentedEmbedder:
         except Exception as e:
             console.print(f"[red]Failed to create embeddings: {e}")
 
-    def extract_html_scib(self, url: str) -> Optional[Tuple[str, str]]:
+    def extract_html(self, url: str) -> Optional[Tuple[str, str]]:
         try:
             response = requests.get(url)
             response.raise_for_status()
@@ -120,6 +120,9 @@ class RetrievalAugmentedEmbedder:
             url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
             response = requests.get(url)
             response.raise_for_status()
+        except IndexError as e:
+            console.log(f"[yellow] No wikipedia content found.")
+            return None 
         except requests.exceptions.Timeout as e:
             console.log(f"[red]Request timed out: URL={url} | Error={e}")
             return None
@@ -153,15 +156,16 @@ class RetrievalAugmentedEmbedder:
 
 
     def embedding_pipeline(self, url:str) -> None:
-        result = self.extract_html_scib(url)
+        result = self.extract_html(url)
         if not result:
-            return
-        func_definition, search_term = result
+            return 
+        func_definition, func_description = result
         if not self.embedding_exists(func_definition):
-            embedding_content = self.extract_wiki_content(search_term)
-            if embedding_content:
-                self.add_embedding(embedding_content)
-                self.add_function({"definition": func_definition, "description": embedding_content})
+            embedding_content = self.extract_wiki_content(func_description)
+            if not embedding_content:
+                embedding_content = func_description
+            self.add_embedding(embedding_content)
+            self.add_function({"definition": func_definition, "description": embedding_content})
         else:
             console.log(f"[yellow] Embedding for url {url} exists.")
             
@@ -266,8 +270,56 @@ class RetrievalAugmentedEmbedder:
 
 if __name__ == "__main__":
     rag = RetrievalAugmentedEmbedder()
-    url = "https://scib-metrics.readthedocs.io/en/latest/generated/scib_metrics.utils.pca.html"
-    rag.embedding_pipeline(url)    
+    urls = [
+
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.calculate_qc_metrics.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.filter_cells.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.filter_genes.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.normalize_total.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.log1p.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.highly_variable_genes.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.regress_out.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.scale.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.pca.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.normalize_pearson_residuals.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.flag_gene_family.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.filter_highly_variable.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.harmony_integrate.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.scrublet.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.scrublet_simulate_doublets.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.neighbors.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.bbknn.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.umap.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.tsne.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.diffmap.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.draw_graph.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.mde.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.embedding_density.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.louvain.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.leiden.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.kmeans.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.score_genes.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.score_genes_cell_cycle.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.tl.rank_genes_groups_logreg.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.get.aggregate.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.get.anndata_to_GPU.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.get.anndata_to_CPU.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.get.X_to_GPU.html",
+    "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.get.X_to_CPU.html",
+
+    # CellTypist
+    "https://celltypist.readthedocs.io/en/latest/celltypist.train.html",
+    "https://celltypist.readthedocs.io/en/latest/celltypist.annotate.html#celltypist.annotate",
+    "https://celltypist.readthedocs.io/en/latest/celltypist.dotplot.html",
+    "https://celltypist.readthedocs.io/en/latest/celltypist.models.download_models.html",
+    "https://celltypist.readthedocs.io/en/latest/celltypist.samples.downsample_adata.html",
+    "https://celltypist.readthedocs.io/en/latest/celltypist.classifier.AnnotationResult.html",
+    "https://celltypist.readthedocs.io/en/latest/celltypist.classifier.Classifier.html",
+    "https://celltypist.readthedocs.io/en/latest/celltypist.models.Model.html",
+    ]
+
+    for url in urls:
+        rag.embedding_pipeline(url)    
     print(rag.query("What is pca"))
 
     
