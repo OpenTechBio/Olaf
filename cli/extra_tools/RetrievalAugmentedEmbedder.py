@@ -138,7 +138,7 @@ class RetrievalAugmentedEmbedder:
         
         page_sentences = re.split(r'(?<=[.!?]) +', text)
         embedding_content = " ".join(page_sentences[:EMBEDDING_LEN])
-        
+
         return embedding_content
 
 
@@ -161,9 +161,13 @@ class RetrievalAugmentedEmbedder:
             return 
         func_definition, func_description = result
         if not self.embedding_exists(func_definition):
-            embedding_content = self.extract_wiki_content(func_description)
+            #300 is the max length allowed for a wiki search 
+            search_term = func_description if len(func_description) <=300 else func_definition.split("(")[0].split(".")[-1]
+            console.print(f"The search term is {search_term}")
+            embedding_content = self.extract_wiki_content(search_term)
             if not embedding_content:
                 embedding_content = func_description
+            print(embedding_content)
             self.add_embedding(embedding_content)
             self.add_function({"definition": func_definition, "description": embedding_content})
         else:
@@ -271,7 +275,8 @@ class RetrievalAugmentedEmbedder:
 if __name__ == "__main__":
     rag = RetrievalAugmentedEmbedder()
     urls = [
-
+    "https://docs.scvi-tools.org/en/stable/api/reference/scvi.model.SCVI.html",
+    "https://docs.scvi-tools.org/en/stable/api/reference/scvi.model.SCANVI.html",
     "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.calculate_qc_metrics.html",
     "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.filter_cells.html",
     "https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.filter_genes.html",
