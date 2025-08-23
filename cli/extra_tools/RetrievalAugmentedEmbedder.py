@@ -144,7 +144,7 @@ class RetrievalAugmentedEmbedder:
 
     def embedding_exists(self, func_name:str) -> bool:
         for function in self.functions:
-            if func_name in function["definition"]:
+            if func_name in function["signature"]:
                 return True
         return False
         
