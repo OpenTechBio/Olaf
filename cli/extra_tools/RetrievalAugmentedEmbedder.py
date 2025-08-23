@@ -150,8 +150,8 @@ class RetrievalAugmentedEmbedder:
         
     def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
-            if name in function["definition"]:
-                return function["definition"]
+            if name in function["signature"]:
+                return function["signature"]
         return None
 
 
@@ -169,7 +169,7 @@ class RetrievalAugmentedEmbedder:
                 embedding_content = func_description
             print(embedding_content)
             self.add_embedding(embedding_content)
-            self.add_function({"definition": func_definition, "description": embedding_content})
+            self.add_function({"signature": func_definition, "embedding": embedding_content})
         else:
             console.log(f"[yellow] Embedding for url {url} exists.")
             
@@ -187,7 +187,7 @@ class RetrievalAugmentedEmbedder:
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
-        return self.functions[idx]["description"] 
+        return self.functions[idx]["embedding"] 
 
     def umap_plot(self) -> None:
         if not self.embeddings or not self.queries:
@@ -214,7 +214,7 @@ class RetrievalAugmentedEmbedder:
                     label="Queries", color="red", marker="x", s=100)
         
         for i, (x, y) in enumerate(umap_embeddings[:len(self.embeddings)]):
-            plt.annotate(self.functions[i]["definition"], (x, y), textcoords="offset points", xytext=(0, 5),
+            plt.annotate(self.functions[i]["signature"], (x, y), textcoords="offset points", xytext=(0, 5),
                          ha='center', fontsize=8, color='blue')
         
         for i, (x, y) in enumerate(umap_embeddings[len(self.embeddings):]):

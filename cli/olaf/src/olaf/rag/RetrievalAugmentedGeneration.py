@@ -63,8 +63,8 @@ class RetrievalAugmentedGeneration():
 
     def retrieve_function(self, name:str) -> Optional[str]:
         for function in self.functions:
-            if name in function["definition"]:
-                return function["definition"]
+            if name in function["signature"]:
+                return function["signature"]
         return None
 
     def query(self, text_query: str) -> Optional[np.ndarray]:
@@ -75,7 +75,7 @@ class RetrievalAugmentedGeneration():
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
-        return self.functions[idx]["definition"]
+        return self.functions[idx]["signature"]
 
  # ──────Implementation──────────────────────────────────────────────────────────
 
