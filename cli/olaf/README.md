@@ -38,6 +38,7 @@ To install the latest development version, you can clone the repository and inst
 git clone https://github.com/OpenTechBio/Olaf
 cd olaf/cli/olaf
 pip install -e .
+olaf
 ```
 
 -----
