@@ -22,7 +22,9 @@ dependencies = [
   "jupyter-client",   # NOTE: PyPI name has a hyphen
   "nbformat",
   "typer",
-  "platformdirs"
+  "platformdirs",
+  "sentence_transformers",
+  "tf_keras"
 ]
 
 # If you want a command like `olaf …`

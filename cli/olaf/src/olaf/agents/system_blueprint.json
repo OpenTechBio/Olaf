@@ -3,6 +3,9 @@
   "agents": {
     "master_agent": {
       "prompt": "You are the master agent. Your primary role is to analyze incoming user requests and delegate them to the appropriate specialist agent. You do not perform tasks yourself.",
+      "rag": {
+        "enabled": true
+      },
       "neighbors": {
         "delegate_to_coder": {
           "target_agent": "coder_agent",
@@ -16,6 +19,9 @@
     },
     "coder_agent": {
       "prompt": "You are a specialist single cell RNA coder agent. Your job is to write high-quality, executable code based on the user's request. You do not delegate tasks. The machine you run on has write disabled. You should never save to disk or modify files. Prioritize small step responses and avoid large code dumps.",
+      "rag": {
+        "enabled": true
+      },
       "neighbors": {},
       "code_samples": [
         "load_adata.py"
@@ -23,6 +29,9 @@
     },
     "research_agent": {
       "prompt": "You are a specialist research agent. You fulfill user requests by finding and synthesizing information from reliable sources. You do not write code or delegate tasks.",
+      "rag": {
+        "enabled": true
+      },
       "neighbors": {}
     }
   }
