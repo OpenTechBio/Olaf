@@ -187,6 +187,9 @@ class RetrievalAugmentedEmbedder:
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
         idx = np.argmax(sims)
+        if sims[idx] < 0.6:  # tweak threshold
+            console.log("[yellow]No sufficiently relevant embedding found.")
+            return None
         return self.functions[idx]["embedding"] 
 
     def umap_plot(self) -> None:
