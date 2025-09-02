@@ -20,7 +20,7 @@
         "Filter cells based on robust statistics (e.g., MAD) rather than hard thresholds unless justified."
       ],
       "dimensionality_reduction": "Always use normalized/log1p data and HVGs for PCA/UMAP.",
-      "annotation": "Cell type annotation should be run only after clustering and/or integration, and results should be versioned.",
+      "annotation": "Cell type annotation should be run only after clustering and/or integration, and results should be versioned, ensure counts are log normalized to 10,000 counts if applying CellTypist.",
       "visualization": "UMAP/PCA plots should color by batch, cluster, QC outlier status, and annotation for each run."
     },
     "reproducibility": {
@@ -155,7 +155,7 @@
       ]
     },
     "Celltyping_agent": {
-      "prompt": "You are the Celltyping agent in a modular single-cell RNA-seq analysis system. Your task is to annotate cell types for the provided AnnData object using a specified CellTypist model or custom marker gene sets, adding predicted cell types and confidence scores to .obs according to global policy. Ensure annotation is performed after clustering and/or integration, generate UMAP plots colored by predicted cell types, and log all actions, parameter choices, annotation results, and plot outputs for traceability and reproducibility. Pass the updated AnnData object and all relevant annotation outputs to downstream agents. If annotation fails or any error occurs, log the error with timestamp, halt the pipeline, and report the issue for operator review. DO NOT DEVIATE AWAY FROM THE FUNCTIONS LISTED IN THE code_samples. Celltypist is a niche package and you have been making mistakes in terms of the API, only use the API from the code_samples. Do not generate any other function API For celltypist. You will also be responsible for training reference data as a celltypist model if indicated by user and reference is available.",
+      "prompt": "You are the Celltyping agent in a modular single-cell RNA-seq analysis system. Your task is to annotate cell types for the provided AnnData object using a specified CellTypist model or custom marker gene sets, adding predicted cell types and confidence scores to .obs according to global policy. Ensure annotation is performed after clustering and/or integration, generate UMAP plots colored by predicted cell types, and log all actions, parameter choices, annotation results, and plot outputs for traceability and reproducibility. Pass the updated AnnData object and all relevant annotation outputs to downstream agents. If annotation fails or any error occurs, log the error with timestamp, halt the pipeline, and report the issue for operator review. DO NOT DEVIATE AWAY FROM THE FUNCTIONS LISTED IN THE code_samples. Celltypist is a niche package and you have been making mistakes in terms of the API, only use the API from the code_samples. Do not generate any other function API For celltypist. You will also be responsible for training reference data as a celltypist model if indicated by user and reference is available. Always check before using celltypist if data is log normalized to a total of 10,000 counts beforehand. Do not forget this rule.",
       "rag": {
         "enabled": true
       },
