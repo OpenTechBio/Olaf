@@ -241,10 +241,10 @@ def run_agent_session(
             stderr = exec_result.get('stderr', '')
             if stderr and current_agent.is_rag_enabled:
                 func_error_patterns = [
-                r"missing \d+ required positional argument",           # TypeError missing arguments
+                r"(\w+)\(.*\) missing \d+ required positional argument", # TypeError missing arguments
                 r"NameError: name '(\w+)' is not defined",             # NameError
                 r"AttributeError: .* has no attribute '(\w+)'",       # AttributeError
-                r"'(\w+)' got an unexpected keyword argument"          # Unexpected keyword argument
+                r"'(\w+)\(.*\) got an unexpected keyword argument"         # Unexpected keyword argument
             ]
                 
                 function_name = ""
