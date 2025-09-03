@@ -74,6 +74,7 @@ class RetrievalAugmentedGeneration():
             return None
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
+        print("the cosine similarity is", sims)
         idx = np.argmax(sims)
         return self.functions[idx]["signature"]
 
@@ -81,4 +82,5 @@ class RetrievalAugmentedGeneration():
 
 if __name__ == "__main__":
     rag = RetrievalAugmentedGeneration()
-    print(rag.query("What is pca"))
+    print(rag.query("Find a function to download model"))
+    print(rag.query("AttributeError: module 'celltypist.models' has no attribute 'download_model'"))
