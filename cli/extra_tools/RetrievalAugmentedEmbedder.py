@@ -281,8 +281,8 @@ class RetrievalAugmentedEmbedder:
 
 if __name__ == "__main__":
     rag = RetrievalAugmentedEmbedder()
-    rag.embedding_pipeline_functions()
-    print(rag.query("Find a function to do pca"))
+    #rag.embedding_pipeline_functions()
+    print(rag.query("Find a function to download the model"))
     print(rag.query("AttributeError: module 'celltypist.models' has no attribute 'download_model'"))  
     rag.cosine_distance_heatmap()
 
