@@ -172,7 +172,11 @@ class RetrievalAugmentedEmbedder:
             self.add_function({"signature": func_definition, "embedding": embedding_content})
         else:
             console.log(f"[yellow] Embedding for url {url} exists.")
-            
+
+    def embedding_pipeline_functions(self):
+        for i in range(len(self.functions)):
+            embedding_content = self.functions[i]["embedding"]
+            self.add_embedding(embedding_content)
 
     @staticmethod
     def cosine_similarity(A: np.ndarray, B: List[np.ndarray]) -> List[float]:
@@ -277,6 +281,7 @@ class RetrievalAugmentedEmbedder:
 
 if __name__ == "__main__":
     rag = RetrievalAugmentedEmbedder()
+    rag.embedding_pipeline_functions()
     print(rag.query("Find a function to do pca"))
     print(rag.query("AttributeError: module 'celltypist.models' has no attribute 'download_model'"))  
     rag.cosine_distance_heatmap()
