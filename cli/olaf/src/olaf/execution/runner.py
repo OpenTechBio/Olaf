@@ -40,7 +40,7 @@ _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
 _OUTPUTS_DIR = OLAF_HOME / "runs"
 _SNIPPET_DIR = _OUTPUTS_DIR / "snippets"
 _LEDGER_PATH = _OUTPUTS_DIR / f"benchmark_history_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.jsonl"
-_RAG_RE = re.compile(r"query_rag_<([^>]+)>")
+_RAG_RE = re.compile(r"query_rag_([^>]+)")
 RAG = RetrievalAugmentedGeneration()
 
 
