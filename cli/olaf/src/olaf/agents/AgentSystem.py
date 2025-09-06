@@ -55,7 +55,7 @@ class Agent:
             full_prompt += "\n\nIf an error occurs, admit the error and query your specialized knowledge base for more context with the following command:"
             full_prompt += f"\n- Command: `query_rag_<function>`"
             full_prompt += f"\n  - Description: Retrieves relevant information about a specific <function> from your knowledge base. Replace <function> with a concise, descriptive search query (e.g., function names, task you are trying to complete)."
-            full_prompt += f"\n  - Example: `query_rag_<scvi model setup>`"
+            full_prompt += f"\n  - Example: `query_rag_scvi model setup`"
             
         if self.code_samples:
             full_prompt += "\n\n  - Code Samples Available:"
