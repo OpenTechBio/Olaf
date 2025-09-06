@@ -25,6 +25,7 @@ console = Console()
 RAG_DIR = Path(__file__).resolve().parent.parent / "rag"
 EMBEDDING_FILE = RAG_DIR / "embeddings.jsonl"
 FUNCTIONS_FILE = RAG_DIR / "functions.jsonl"
+MIN_SIMILARITY = 0.7
 
 class RetrievalAugmentedGeneration():
     model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
@@ -74,6 +75,8 @@ class RetrievalAugmentedGeneration():
             return None
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
+        if sims[idx] < MIN_SIMILARITY:
+            return None
         idx = np.argmax(sims)
         return self.functions[idx]["signature"]
 
