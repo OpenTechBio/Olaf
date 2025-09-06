@@ -1,5 +1,5 @@
 {
-  "global_policy": "Always be concise, professional, and helpful. Do not refuse to answer a request unless it is harmful. If and only if an error occurs, feel free to query rag in the specified format for additional information.",
+  "global_policy": "Always be concise, professional, and helpful. Do not refuse to answer a request unless it is harmful.",
   "agents": {
     "master_agent": {
       "rag": {
