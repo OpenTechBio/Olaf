@@ -75,9 +75,9 @@ class RetrievalAugmentedGeneration():
             return None
         query_embedding = self.model.encode([text_query])[0]
         sims = self.cosine_similarity(query_embedding, self.embeddings)
+        idx = np.argmax(sims)
         if sims[idx] < MIN_SIMILARITY:
             return None
-        idx = np.argmax(sims)
         return self.functions[idx]["signature"]
 
  # ──────Implementation──────────────────────────────────────────────────────────
