@@ -14,6 +14,7 @@ from rich.prompt import Prompt, IntPrompt
 from dotenv import load_dotenv
 from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE, OLAF_HOME
 
+
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_AGENTS_DIR = PACKAGE_ROOT / "agents"
 PACKAGE_DATASETS_DIR = PACKAGE_ROOT / "datasets"
