@@ -5,28 +5,29 @@ import textwrap
 from pathlib import Path
 from typing import List, Tuple, cast, Optional
 import subprocess
+import json
+from datetime import datetime
 
 import typer
 from rich.console import Console
 from rich.prompt import Prompt, IntPrompt
 from dotenv import load_dotenv
+from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE, OLAF_HOME
+
 
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_AGENTS_DIR = PACKAGE_ROOT / "agents"
 PACKAGE_DATASETS_DIR = PACKAGE_ROOT / "datasets"
 PACKAGE_AUTO_METRICS_DIR = PACKAGE_ROOT / "auto_metrics"
 
-# Define static in-container paths for primary and reference datasets
 SANDBOX_DATA_PATH = "/workspace/dataset.h5ad"
 SANDBOX_REF_DATA_PATH = "/workspace/reference.h5ad"
-
 
 def _prompt_for_file(
     console: Console, user_dir: Path, package_dir: Path, extension: str, prompt_title: str
 ) -> Path:
     """
     Generic helper to find files in both user and package directories and prompt for a selection.
-    User files take priority over package files with the same name.
     """
     console.print(f"[bold]Select {prompt_title}:[/bold]")
     found_files = []
@@ -116,7 +117,6 @@ def main_run_callback(
     force_refresh: bool = typer.Option(False, "--force-refresh", help="Force refresh/rebuild of the sandbox environment."),
 ):
     # --- Heavy imports are deferred to here ---
-    from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE
     from olaf.agents.AgentSystem import AgentSystem
     from olaf.core.io_helpers import collect_resources
     from olaf.core.sandbox_management import init_docker, init_singularity_exec
@@ -182,7 +182,6 @@ def main_run_callback(
     if app_context.reference_dataset_path:
         app_context.resources.append((app_context.reference_dataset_path, SANDBOX_REF_DATA_PATH))
 
-    # Build the analysis context string, including the reference dataset if it exists
     analysis_context_str = f"Primary dataset path: **{SANDBOX_DATA_PATH}**\n"
     if app_context.reference_dataset_path:
         analysis_context_str += f"Reference dataset path: **{SANDBOX_REF_DATA_PATH}**\n"
@@ -194,9 +193,9 @@ def main_run_callback(
 
 def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, max_turns: int, benchmark_modules: Optional[List[Path]] = None):
     """Helper to start, run, and stop the sandbox session."""
-    # --- Heavy imports needed for the session are deferred to here ---
     from olaf.execution.runner import run_agent_session, SandboxManager
     from olaf.agents.AgentSystem import AgentSystem
+    from olaf.core.io_helpers import save_chat_history_as_json, save_chat_history_as_notebook
 
     sandbox_manager = cast(SandboxManager, context.sandbox_manager)
     console = context.console
@@ -206,7 +205,6 @@ def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, ma
     details = context.sandbox_details
     dataset_path = cast(Path, context.dataset_path)
     if details["is_exec_mode"] and hasattr(sandbox_manager, "set_data"):
-        # Pass all resources, including the reference dataset, for bind mounting
         all_resources = [(dataset_path, SANDBOX_DATA_PATH)] + context.resources
         sandbox_manager.set_data(all_resources)
     if not sandbox_manager.start_container():
@@ -215,9 +213,7 @@ def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, ma
     
     try:
         if not details["is_exec_mode"]:
-            # Copy primary dataset
             details["copy_cmd"](str(dataset_path), f"{details['handle']}:{SANDBOX_DATA_PATH}")
-            # Copy all other resources, including the reference dataset
             for hp, cp in context.resources:
                 details["copy_cmd"](str(hp), f"{details['handle']}:{cp}")
 
@@ -237,6 +233,26 @@ def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, ma
     finally:
         console.print("[cyan]Stopping sandbox...[/cyan]")
         sandbox_manager.stop_container()
+        if not is_auto:
+            if Prompt.ask("\n[bold]Do you want to save the chat history?[/bold]", choices=["y", "n"], default="y").lower() == 'y':
+                log_dir = OLAF_HOME / "runs" / "chat_logs"
+                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                
+                # --- NEW: Prompt for save format ---
+                save_format = Prompt.ask("Save format", choices=["json", "notebook"], default="notebook")
+                file_extension = ".ipynb" if save_format == "notebook" else ".json"
+                
+                default_path = log_dir / f"interactive_chat_{timestamp}{file_extension}"
+                save_path_str = Prompt.ask(
+                    "Enter the save path for the log",
+                    default=str(default_path)
+                )
+                save_path = Path(save_path_str).expanduser()
+
+                if save_format == "notebook":
+                    save_chat_history_as_notebook(console, history, save_path)
+                else:
+                    save_chat_history_as_json(console, history, save_path)
 
 @run_app.command("interactive")
 def run_interactive(ctx: typer.Context):

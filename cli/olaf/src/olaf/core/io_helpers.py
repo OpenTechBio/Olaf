@@ -181,3 +181,53 @@ def format_execute_response(resp: dict, output_dir) -> str:
     if img_paths:
         lines.append("Saved images: " + ", ".join(img_paths))
     return "\n".join(lines)
+
+def save_chat_history_as_json(console: Console, history: list, file_path: Path):
+    """Saves the interactive chat history to a user-specified JSON file."""
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=2)
+        console.print(f"\n[bold green]✓ Chat history saved to:[/bold green] {file_path}")
+    except Exception as e:
+        console.print(f"\n[bold red]Error saving chat history: {e}[/bold red]")
+
+def save_chat_history_as_notebook(console: Console, history: list, file_path: Path):
+    """Parses an OLAF chat log and converts it into a Jupyter Notebook (.ipynb)."""
+    notebook = {
+        "cells": [],
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3 (ipykernel)",
+                "language": "python",
+                "name": "python3"
+            },
+            "language_info": { "name": "python", "version": "3.11" }
+        },
+        "nbformat": 4,
+        "nbformat_minor": 5
+    }
+    code_block_re = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
+
+    for message in history:
+        if message.get("role") and "assistant" in message.get("role", ""):
+            content = message.get("content", "")
+            parts = code_block_re.split(content)
+            for i, part in enumerate(parts):
+                part = part.strip()
+                if not part: continue
+                
+                if i % 2 == 1: # Code block
+                    cell = {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": part}
+                    notebook["cells"].append(cell)
+                else: # Markdown
+                    cell = {"cell_type": "markdown", "metadata": {}, "source": part}
+                    notebook["cells"].append(cell)
+
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(notebook, f, indent=2)
+        console.print(f"\n[bold green]✓ Notebook saved to:[/bold green] {file_path}")
+    except Exception as e:
+        console.print(f"\n[bold red]Error saving notebook: {e}[/bold red]")
