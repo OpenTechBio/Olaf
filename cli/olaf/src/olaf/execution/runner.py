@@ -40,7 +40,7 @@ _DELEG_RE = re.compile(r"delegate_to_([A-Za-z0-9_]+)")
 _OUTPUTS_DIR = OLAF_HOME / "runs"
 _SNIPPET_DIR = _OUTPUTS_DIR / "snippets"
 _LEDGER_PATH = _OUTPUTS_DIR / f"benchmark_history_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.jsonl"
-_RAG_RE = re.compile(r"query_rag_<([^>]+)>")
+_RAG_RE = re.compile(r"query_rag_([^>]+)")
 RAG = RetrievalAugmentedGeneration()
 
 
@@ -241,33 +241,33 @@ def run_agent_session(
             stderr = exec_result.get('stderr', '')
             if stderr and current_agent.is_rag_enabled:
                 func_error_patterns = [
-                    r"missing \d+ required positional argument",  # TypeError: missing argument
-                    r"NameError: name '(\w+)' is not defined",    # NameError
-                    r"AttributeError: '.*' object has no attribute '(\w+)'",  # missing attribute
-                    r"got an unexpected keyword argument"         # wrong keyword argument
-                ]
+                r"(\w+)\(.*\) missing \d+ required positional argument", # TypeError missing arguments
+                r"NameError: name '(\w+)' is not defined",             # NameError
+                r"AttributeError: .* has no attribute '(\w+)'",       # AttributeError
+                r"'(\w+)\(.*\) got an unexpected keyword argument"         # Unexpected keyword argument
+            ]
+                
                 function_name = ""
                 retrieved_docs = ""
-                if any(re.search(pat, stderr) for pat in func_error_patterns):
-                    lines = stderr.strip().splitlines()
-                    if len(lines) >= 2:
-                        code_line = lines[-2].strip()  # second-to-last line: code that failed
-                        match = re.search(r'(\w+)\s*\(', code_line)
-                        if match:
-                            function_name = match.group(1)
-            
+                
+                for pat in func_error_patterns:
+                    match = re.search(pat, stderr)
+                    if match:
+                        function_name = [g for g in match.groups() if g]
+                        break
+                            
                 if function_name:
+                    function_name = function_name[0]
+                    console.print(f"[yellow]🔍 Incorrect function signature detected: {function_name}, function database search...[/yellow]")
                     retrieved_docs = RAG.retrieve_function(function_name)
-                    console.print(f"[yellow]🔍 Missing function detected: {function_name}, function database search...[/yellow]")
-                if retrieved_docs:
-                    console.print(f"[green] Query successful - Function signature found. [/green]")
-                    feedback += f"\n {function_name} produced an error. The correct function signature for {function_name} is:\n{retrieved_docs}"
-                    console.print(feedback)
-                    history.append({"role": "system", "content": feedback})
-                    continue
-                else:
-                    print(f"RAG Error Query unsuccessful - Function signature does not exist in the current database.")
-             
+                    if retrieved_docs:
+                        console.print(f"[green] Query successful - Function signature found. [/green]")
+                        feedback += f"\n {function_name} produced an error. The correct function signature for {function_name} is:\n{retrieved_docs}"
+                        history.append({"role": "system", "content": feedback})
+                        continue
+                    else:
+                        print(f"Error Query unsuccessful - Function signature does not exist in the current database.")
+                 
 
         if is_auto:
             if benchmark_modules:
