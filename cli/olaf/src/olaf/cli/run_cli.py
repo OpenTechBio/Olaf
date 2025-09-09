@@ -11,13 +11,6 @@ from rich.console import Console
 from rich.prompt import Prompt, IntPrompt
 from dotenv import load_dotenv
 
-from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE
-from olaf.agents.AgentSystem import Agent, AgentSystem
-from olaf.core.io_helpers import collect_resources
-from olaf.core.sandbox_management import (init_docker, init_singularity_exec)
-from olaf.execution.runner import run_agent_session, SandboxManager
-from olaf.datasets.czi_datasets import get_datasets_dir
-
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_AGENTS_DIR = PACKAGE_ROOT / "agents"
 PACKAGE_DATASETS_DIR = PACKAGE_ROOT / "datasets"
@@ -56,7 +49,7 @@ def _prompt_for_file(
     choice_str = Prompt.ask("Enter the number of your choice", choices=[str(i) for i in range(1, len(found_files) + 1)])
     return found_files[int(choice_str) - 1]['path']
 
-def _prompt_for_driver(console: Console, system: AgentSystem) -> str:
+def _prompt_for_driver(console: Console, system: 'AgentSystem') -> str:
     """Prompts the user to select a driver agent from the loaded system."""
     console.print("[bold]Select a driver agent:[/bold]")
     agents = list(system.agents.keys())
@@ -97,11 +90,11 @@ run_app = typer.Typer(
 class AppContext:
     def __init__(self):
         self.console = Console()
-        self.agent_system: AgentSystem | None = None
+        self.agent_system: 'AgentSystem' | None = None
         self.driver_agent_name: str | None = None
         self.roster_instructions: str | None = None
         self.analysis_context: str | None = None
-        self.sandbox_manager: SandboxManager | None = None
+        self.sandbox_manager: 'SandboxManager' | None = None
         self.llm_client: object | None = None
         self.initial_history: List[dict] | None = None
         self.dataset_path: Path | None = None
@@ -122,6 +115,13 @@ def main_run_callback(
     sandbox: str = typer.Option(None, "--sandbox", help="Sandbox backend to use: 'docker' or 'singularity'."),
     force_refresh: bool = typer.Option(False, "--force-refresh", help="Force refresh/rebuild of the sandbox environment."),
 ):
+    # --- Heavy imports are deferred to here ---
+    from olaf.config import DEFAULT_AGENT_DIR, ENV_FILE
+    from olaf.agents.AgentSystem import AgentSystem
+    from olaf.core.io_helpers import collect_resources
+    from olaf.core.sandbox_management import init_docker, init_singularity_exec
+    from olaf.datasets.czi_datasets import get_datasets_dir
+
     load_dotenv(dotenv_path=ENV_FILE)
     app_context = AppContext()
     console = app_context.console
@@ -194,6 +194,10 @@ def main_run_callback(
 
 def _setup_and_run_session(context: AppContext, history: list, is_auto: bool, max_turns: int, benchmark_modules: Optional[List[Path]] = None):
     """Helper to start, run, and stop the sandbox session."""
+    # --- Heavy imports needed for the session are deferred to here ---
+    from olaf.execution.runner import run_agent_session, SandboxManager
+    from olaf.agents.AgentSystem import AgentSystem
+
     sandbox_manager = cast(SandboxManager, context.sandbox_manager)
     console = context.console
     
