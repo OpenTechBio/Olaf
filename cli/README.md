@@ -1,3 +1,11 @@
+[!IMPORTANT]
+Project Update: OLAF has been spun off into CARIBOU
+
+To better prioritize the project and support high-performance compute (HPC) infrastructure, the OLAF CLI has been spun off into a new, dedicated project called CARIBOU.
+
+Please visit the new repository for the latest updates:
+https://github.com/OpenTechBio/CARIBOU
+
 # OLAF CLI: The Open-source Language Agent Framework 🚀
 
 **The OLAF CLI is a powerful command-line interface for building, testing, and running sandboxed, multi-agent AI systems.** 
